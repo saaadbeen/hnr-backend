@@ -14,6 +14,9 @@ public class ActionService {
     @Autowired
     private ActionRepository actionRepository;
 
+    public List<Action> findByIdDouar(String idDouar) {
+        return actionRepository.findByIdDouar(idDouar);
+    }
     public List<Action> getAllActions() {
         return actionRepository.findAll();
     }

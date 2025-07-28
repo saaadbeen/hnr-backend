@@ -18,6 +18,9 @@ public class ChangementService {
         return changementRepository.findAll();
     }
 
+    public List<Changement> findByIdDouar(String idDouar) {
+        return changementRepository.findByIdDouar(idDouar);
+    }
     public Optional<Changement> getChangementById(String id) {
         return changementRepository.findById(id);
     }

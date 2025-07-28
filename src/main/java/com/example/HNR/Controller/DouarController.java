@@ -23,11 +23,12 @@ public class DouarController {
 
     // Pour l’instant, on garde ces repos, on migrera vers des services plus tard
     @Autowired
-    private PVRepository pvRepository;
+    private com.example.HNR.Service.PVService pvService;
     @Autowired
-    private ChangementRepository changementRepository;
+    private com.example.HNR.Service.ChangementService changementService;
     @Autowired
-    private ActionRepository actionRepository;
+    private com.example.HNR.Service.ActionService actionService;
+
 
     // --- CRUD sur les douars ---
 
@@ -59,19 +60,18 @@ public class DouarController {
     }
 
     // --- Endpoints “filles” pour PV, Changement et Action ---
-
     @GetMapping("/{id}/pvs")
     public List<PV> getPvsByDouar(@PathVariable String id) {
-        return pvRepository.findByIdDouar(id);
+        return pvService.findByIdDouar(id);
     }
 
     @GetMapping("/{id}/changements")
     public List<Changement> getChangementsByDouar(@PathVariable String id) {
-        return changementRepository.findByIdDouar(id);
+        return changementService.findByIdDouar(id);
     }
 
     @GetMapping("/{id}/actions")
     public List<Action> getActionsByDouar(@PathVariable String id) {
-        return actionRepository.findByIdDouar(id);
+        return actionService.findByIdDouar(id);
     }
 }

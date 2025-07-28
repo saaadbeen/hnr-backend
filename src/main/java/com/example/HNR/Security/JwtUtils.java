@@ -1,14 +1,16 @@
 package com.example.HNR.Security;
 
 import io.jsonwebtoken.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.util.Date;
 
 @Component
 public class JwtUtils {
 
-    // À externaliser en application.properties
-    private final String jwtSecret = "MaCléTrèsSecrète";
+    // Injected from application.properties
+    @Value("${app.jwt.secret}")
+    private String jwtSecret;
     private final long jwtExpirationMs = 24 * 60 * 60 * 1000; // 24h
 
     // 1. Génération du token

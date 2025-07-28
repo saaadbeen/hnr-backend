@@ -14,6 +14,9 @@ public class PVService {
     @Autowired
     private PVRepository pvRepository;
 
+    public List<PV> findByIdDouar(String idDouar) {
+        return pvRepository.findByIdDouar(idDouar);
+    }
     public List<PV> getAllPVs() {
         return pvRepository.findAll();
     }

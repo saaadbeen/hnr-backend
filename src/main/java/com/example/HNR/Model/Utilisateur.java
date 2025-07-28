@@ -15,6 +15,7 @@ import java.util.UUID;
 public class Utilisateur {
     @Id
     private String id;
+    private String login;
 
     private UUID idUtilisateur;      // identifiant métier
     private String nom;
@@ -29,4 +30,11 @@ public class Utilisateur {
     private String password;
 
     private Date dateCreation;
+    public String getLogin() {
+        return login;
+    }
+
+    public void setLogin(String login) {
+        this.login = login;
+    }
 }
