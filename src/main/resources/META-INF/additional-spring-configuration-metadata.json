@@ -1,0 +1,8 @@
+{
+  "properties": [
+    {
+      "name": "spring.ai.vectorstore.mongo.enabled",
+      "type": "java.lang.String",
+      "description": "Description for spring.ai.vectorstore.mongo.enabled."
+  }
+] }
