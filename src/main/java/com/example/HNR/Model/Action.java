@@ -1,16 +1,21 @@
 package com.example.HNR.Model;
-
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import java.util.*;
+
+
 
 import java.util.Date;
 
-@Getter @Setter
-@RequiredArgsConstructor
 @Document(collection = "actions")
+@Data
+@AllArgsConstructor //  constructeur avec tous les arguments
+@NoArgsConstructor  // constructeur sans argument
+@Builder
 public class Action {
     @Id
     private String id;
@@ -18,7 +23,7 @@ public class Action {
     private Date dateAction;
     private TypeAction type;
 
-    private String idUtilisateur;
+    private Utilisateur utilisateur;
     private String idDouar;
     private String idMission;
 

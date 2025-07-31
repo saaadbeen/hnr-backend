@@ -2,20 +2,20 @@ package com.example.HNR.Controller;
 
 import com.example.HNR.Model.Changement;
 import com.example.HNR.Service.ChangementService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/changements")
-@CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class ChangementController {
 
-    @Autowired
-    private ChangementService changementService;
-
-    // --- CRUD de base ---
+    private final ChangementService changementService;
 
     @GetMapping
     public List<Changement> getAllChangements() {
@@ -23,19 +23,13 @@ public class ChangementController {
     }
 
     @GetMapping("/{id}")
-    public Changement getChangementById(@PathVariable String id) {
-        return changementService.getChangementById(id).orElse(null);
+    public Optional<Changement> getChangementById(@PathVariable String id) {
+        return changementService.getChangementById(id);
     }
 
     @PostMapping
     public Changement createChangement(@RequestBody Changement changement) {
-        return changementService.saveChangement(changement);
-    }
-
-    @PutMapping("/{id}")
-    public Changement updateChangement(@PathVariable String id, @RequestBody Changement changement) {
-        changement.setId(id);
-        return changementService.saveChangement(changement);
+        return changementService.createChangement(changement);
     }
 
     @DeleteMapping("/{id}")
@@ -43,17 +37,8 @@ public class ChangementController {
         changementService.deleteChangement(id);
     }
 
-    // --- Requêtes personnalisées ---
-
-    // 1. Lister les changements pour un douar donné
     @GetMapping("/douar/{douarId}")
-    public List<Changement> getChangementsByDouar(@PathVariable String douarId) {
+    public List<Changement> getChangementsByDouarId(@PathVariable String douarId) {
         return changementService.getChangementsByDouarId(douarId);
-    }
-
-    // 2. Récupérer un changement par son code
-    @GetMapping("/code/{code}")
-    public Changement getChangementByCode(@PathVariable String code) {
-        return changementService.getChangementByCode(code);
     }
 }

@@ -2,6 +2,7 @@ package com.example.HNR.Model;
 
 public enum Role {
     AGENT_AUTORITE,
-    FONCTIONNAIRE,
-    SUPERVISEUR
+    MEMBRE_DSI,
+    GOUVERNEUR,
+    Admin
 }

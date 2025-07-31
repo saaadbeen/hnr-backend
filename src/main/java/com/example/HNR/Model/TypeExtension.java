@@ -1,6 +1,6 @@
 package com.example.HNR.Model;
 
-public enum TypeChangement {
+public enum TypeExtension {
     HORIZONTAL,
         VERTICAL
 }

@@ -1,23 +1,21 @@
 package com.example.HNR.Model;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.Date;
 import java.util.UUID;
 
-@Getter @Setter
-@RequiredArgsConstructor
+@Data                       // génère getter, setter, toString, equals, hashCode
+@AllArgsConstructor //  constructeur avec tous les arguments
+@NoArgsConstructor  // constructeur sans argument
+@Builder                    // créer des objets de manière fluide et immuable
 @Document(collection = "utilisateurs")
 public class Utilisateur {
     @Id
     private String id;
-    private String login;
 
-    private UUID idUtilisateur;      // identifiant métier
     private String nom;
     private String prenom;
 
@@ -29,12 +27,4 @@ public class Utilisateur {
     private String email;
     private String password;
 
-    private Date dateCreation;
-    public String getLogin() {
-        return login;
-    }
-
-    public void setLogin(String login) {
-        this.login = login;
-    }
 }

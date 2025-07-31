@@ -2,45 +2,50 @@ package com.example.HNR.Controller;
 
 import com.example.HNR.Model.Utilisateur;
 import com.example.HNR.Service.UtilisateurService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/utilisateurs")
-@CrossOrigin(origins = "*")
+@RequestMapping("/utilisateurs")
 public class UtilisateurController {
 
     @Autowired
     private UtilisateurService utilisateurService;
 
-    // --- CRUD de base ---
-
     @GetMapping
-    public List<Utilisateur> getAllUtilisateurs() {
+    public List<Utilisateur> getAll() {
         return utilisateurService.getAllUtilisateurs();
     }
 
     @GetMapping("/{id}")
-    public Utilisateur getUtilisateurById(@PathVariable String id) {
-        return utilisateurService.getUtilisateurById(id).orElse(null);
+    public Utilisateur getById(@PathVariable String id) {
+        return utilisateurService.getUtilisateurById(id);
+    }
+
+    @GetMapping("/email/{email}")
+    public Utilisateur getByEmail(@PathVariable String email) {
+        return utilisateurService.findByEmail(email);
     }
 
     @PostMapping
-    public Utilisateur createUtilisateur(@RequestBody Utilisateur utilisateur) {
-        return utilisateurService.saveUtilisateur(utilisateur);
+    public Utilisateur create(@RequestBody Utilisateur utilisateur) {
+        return utilisateurService.createUtilisateur(utilisateur);
     }
 
     @PutMapping("/{id}")
-    public Utilisateur updateUtilisateur(@PathVariable String id, @RequestBody Utilisateur utilisateur) {
-        // Ajuste ici selon le nom du setter de l'ID dans ta classe Utilisateur
-        utilisateur.setId(id);
-        return utilisateurService.saveUtilisateur(utilisateur);
+    public Utilisateur update(@PathVariable String id, @RequestBody Utilisateur utilisateur) {
+        return utilisateurService.updateUtilisateur(id, utilisateur);
     }
 
     @DeleteMapping("/{id}")
-    public void deleteUtilisateur(@PathVariable String id) {
+    public void delete(@PathVariable String id) {
         utilisateurService.deleteUtilisateur(id);
     }
 }

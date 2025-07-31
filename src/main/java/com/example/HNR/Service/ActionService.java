@@ -1,22 +1,20 @@
 package com.example.HNR.Service;
 
 import com.example.HNR.Model.Action;
-import com.example.HNR.repository.ActionRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.HNR.Repository.ActionRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class ActionService {
 
-    @Autowired
-    private ActionRepository actionRepository;
+    private final ActionRepository actionRepository;
 
-    public List<Action> findByIdDouar(String idDouar) {
-        return actionRepository.findByIdDouar(idDouar);
-    }
     public List<Action> getAllActions() {
         return actionRepository.findAll();
     }
@@ -25,7 +23,7 @@ public class ActionService {
         return actionRepository.findById(id);
     }
 
-    public Action saveAction(Action action) {
+    public Action createAction(Action action) {
         return actionRepository.save(action);
     }
 
@@ -33,8 +31,19 @@ public class ActionService {
         actionRepository.deleteById(id);
     }
 
-    // Méthode personnalisée : lister les actions pour un douar
+    public List<Action> getActionsByUtilisateurId(String utilisateurId) {
+        return actionRepository.findByUtilisateur_Id(utilisateurId);
+    }
+
+    public List<Action> getActionsByMissionId(String missionId) {
+        return actionRepository.findByIdMission(missionId);
+    }
+
     public List<Action> getActionsByDouarId(String douarId) {
         return actionRepository.findByIdDouar(douarId);
+    }
+
+    public List<Action> getActionsByPvId(String pvId) {
+        return actionRepository.findByIdPv(pvId);
     }
 }
