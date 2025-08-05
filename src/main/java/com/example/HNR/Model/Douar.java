@@ -1,28 +1,24 @@
 package com.example.HNR.Model;
-import lombok.AllArgsConstructor;
-import lombok.Data;
 
-import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import lombok.Data;
+    import com.example.HNR.Model.StatutDouar;
 
-
-import java.util.Date;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 
-
-@AllArgsConstructor //  constructeur avec tous les arguments
-@NoArgsConstructor  // constructeur sans argument
-@Document(collection = "douars")
-@Data// génère getter, setter, toString, equals, hashCode
+@Document(collection = "douars") // Collection MongoDB "douars"
+@Data
 public class Douar {
+
     @Id
-    private String id;
-    private String nom;
-    private StatutDouar statut;    // ✅ enum
-    private List<Date> dateVisites;
-    private List<String> missionIds;
-    private int nombreChangements;
-    private int nombreActions;
+    private String idDouar; // ID MongoDB
+
+    private String nom; // Nom du douar
+    private StatutDouar statut; // Statut (ERADIQUE/NON_ERADIQUE)
+    private String prefectureCommune; // Zone administrative
+    private List<String> visites; // IDs des visites (références Mission)
+    private String idMission; // ID mission associée (référence Mission)
+    private List<String> changements; // IDs changements (références Change)
+    private List<String> actions; // IDs actions (références Action)
 }

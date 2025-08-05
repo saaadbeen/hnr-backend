@@ -1,30 +1,26 @@
 package com.example.HNR.Model;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import lombok.Data;
 
 import java.util.Date;
 import java.util.List;
-import java.util.UUID;
 
-@Data
-@AllArgsConstructor //  constructeur avec tous les arguments
-@NoArgsConstructor  // constructeur sans argument
 @Document(collection = "missions")
+@Data // Génère automatiquement getters, setters, toString, equals, hashCode
 public class Mission {
 
     @Id
-    private String id;
-    private String nom;
-    private String rapportUrl;         // URL vers le fichier PDF (au lieu de byte[])
-    private Date dateEnvoi;
-    private String prefecture;
-    private String commune;
-    private String createurId;
-    private List<Douar> douars;
+    private String idMission; // ID MongoDB
+
+    private Date dateCreation; // Date création
+    private Date dateEnvoi; // Date envoi
+    private String prefectureCommune; // Zone géographique
+    private String rapportPDF; // URL rapport PDF
+    private String creePar; // ID créateur (référence User)
+    private List<String> utilisateursAssignes; // IDs utilisateurs assignés (références User)
+    private String statut; // Statut mission
+    private int nombreDouars; // Nombre douars
+    private int nombreActions; // Nombre actions
 }

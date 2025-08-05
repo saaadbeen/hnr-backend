@@ -2,61 +2,112 @@ package com.example.HNR.Service;
 
 import com.example.HNR.Model.PV;
 import com.example.HNR.Repository.PVRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Calendar;
 
 @Service
-@RequiredArgsConstructor
 public class PVService {
 
     @Autowired
     private PVRepository pvRepository;
 
-    public PV createPv(PV pv) {
+    // Créer un PV
+    public PV createPV(PV pv) {
+        if (pvRepository.existsByNumero(pv.getNumero())) {
+            throw new RuntimeException("Un PV avec ce numéro existe déjà");
+        }
+
+        pv.setDateRedaction(new Date());
         return pvRepository.save(pv);
     }
 
-    public List<PV> getAllPvs() {
+    // Trouver par ID
+    public Optional<PV> findById(String id) {
+        return pvRepository.findById(id);
+    }
+
+    // Trouver par numéro
+    public Optional<PV> findByNumero(String numero) {
+        return pvRepository.findByNumero(numero);
+    }
+
+    // Obtenir tous les PVs
+    public List<PV> findAll() {
         return pvRepository.findAll();
     }
 
-    public PV getPvById(String id) {
-        return pvRepository.findById(id).orElse(null);
+    // Trouver par rédacteur
+    public List<PV> findByRedacteur(String redacteur) {
+        return pvRepository.findByRedacteur(redacteur);
     }
 
-    public PV updatePv(String id, PV updated) {
-        Optional<PV> optional = pvRepository.findById(id);
-        if (optional.isPresent()) {
-            updated.setId(id);
-            return pvRepository.save(updated);
-        } else {
-            return null;
+    // Trouver par statut de validation
+    public List<PV> findByValide(boolean valide) {
+        return pvRepository.findByValide(valide);
+    }
+
+    // PVs entre deux dates
+    public List<PV> findByDateRedactionBetween(Date startDate, Date endDate) {
+        return pvRepository.findByDateRedactionBetween(startDate, endDate);
+    }
+
+    // PVs validés
+    public List<PV> findValidatedPVs() {
+        return pvRepository.findValidatedPVs();
+    }
+
+    // PVs en attente
+    public List<PV> findPendingPVs() {
+        return pvRepository.findPendingPVs();
+    }
+
+    // PVs récents par rédacteur
+    public List<PV> findRecentPVsByRedacteur(String redacteur) {
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DAY_OF_MONTH, -30);
+        return pvRepository.findRecentPVsByRedacteur(redacteur, cal.getTime());
+    }
+
+    // Valider un PV (sans signature)
+    public PV validatePV(String id) {
+        PV pv = pvRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("PV non trouvé"));
+
+        pv.setValide(true);
+        return pvRepository.save(pv);
+    }
+
+    // Mettre à jour un PV
+    public PV updatePV(String id, PV pvDetails) {
+        PV pv = pvRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("PV non trouvé avec ID: " + id));
+
+        if (pvDetails.getContenu() != null) {
+            pv.setContenu(pvDetails.getContenu());
         }
-    }
-
-    public boolean deletePv(String id) {
-        if (pvRepository.existsById(id)) {
-            pvRepository.deleteById(id);
-            return true;
+        if (pvDetails.getUrlPDF() != null) {
+            pv.setUrlPDF(pvDetails.getUrlPDF());
         }
-        return false;
+
+        pv.setValide(pvDetails.isValide());
+
+        return pvRepository.save(pv);
     }
 
-    // 🔍 Find
-    public List<PV> findByMissionId(String missionId) {
-        return pvRepository.findByMissionId(missionId);
+    // Supprimer un PV
+    public void deletePV(String id) {
+        PV pv = pvRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("PV non trouvé avec ID: " + id));
+        pvRepository.delete(pv);
     }
 
-    public List<PV> findByDouarId(String douarId) {
-        return pvRepository.findByIdDouar(douarId);
-    }
-
-    public List<PV> findByRedacteurId(String redacteurId) {
-        return pvRepository.findByRedacteurId(redacteurId);
+    // Compter PVs validés
+    public long countByValide(boolean valide) {
+        return pvRepository.countByValide(valide);
     }
 }

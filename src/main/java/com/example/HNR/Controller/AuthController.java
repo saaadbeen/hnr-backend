@@ -1,58 +1,87 @@
 package com.example.HNR.Controller;
 
-import com.example.HNR.Model.Utilisateur;
-
-import com.example.HNR.Repository.UtilisateurRepository;
+import com.example.HNR.Config.JwtUtil;
+import com.example.HNR.Model.User;
+import com.example.HNR.Service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.example.HNR.Security.JwtUtil;
 
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     @Autowired
-    private UtilisateurRepository utilisateurRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private AuthService authService;
 
     @Autowired
     private JwtUtil jwtUtil;
 
-    // 🔐 Inscription (ajout utilisateur + hash du mot de passe)
-    @PostMapping("/register")
-    public String register(@RequestBody Utilisateur utilisateur) {
-        if (utilisateurRepository.findByEmail(utilisateur.getEmail()).isPresent()) {
-            return "❌ Email déjà utilisé";
-        }
-
-        // 🔑 Hasher le mot de passe avant de le sauvegarder
-        utilisateur.setPassword(passwordEncoder.encode(utilisateur.getPassword()));
-        utilisateurRepository.save(utilisateur);
-
-        return "✅ Utilisateur enregistré avec succès";
-    }
-
-    // 🔑 Connexion (vérifie l’utilisateur et renvoie un token)
+    // POST /api/auth/login - Connexion utilisateur
     @PostMapping("/login")
-    public String login(@RequestBody Utilisateur loginRequest) {
-        // Rechercher l'utilisateur par email
-        Utilisateur utilisateur = utilisateurRepository.findByEmail(loginRequest.getEmail())
-                .orElse(null);
+    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
+        String email = credentials.get("email");
+        String password = credentials.get("password");
 
-        // Vérifier les identifiants
-        if (utilisateur != null &&
-                passwordEncoder.matches(loginRequest.getPassword(), utilisateur.getPassword())) {
-
-            // ✅ Générer un JWT
-            String token = jwtUtil.generateToken(utilisateur.getEmail());
-            return "Bearer " + token;
+        Optional<User> user = authService.authenticate(email, password);
+        if (user.isPresent()) {
+            String token = jwtUtil.generateToken(user.get());
+            return ResponseEntity.ok(Map.of("token", token, "user", user.get()));
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Email ou mot de passe incorrect");
         }
-
-        return "❌ Email ou mot de passe incorrect";
     }
+
+    // POST /api/auth/register - Inscription nouvel utilisateur
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user) {
+        try {
+            User registeredUser = authService.register(user);
+            return ResponseEntity.status(HttpStatus.CREATED).body(registeredUser);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // PUT /api/auth/change-password - Changer de mot de passe
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> passwordData) {
+        try {
+            String userId = passwordData.get("userId");
+            String oldPassword = passwordData.get("oldPassword");
+            String newPassword = passwordData.get("newPassword");
+            authService.changePassword(userId, oldPassword, newPassword);
+            return ResponseEntity.ok("Mot de passe changé avec succès");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // PUT /api/auth/reset-password - Réinitialisation de mot de passe
+    @PutMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> resetData) {
+        try {
+            String userId = resetData.get("userId");
+            String newPassword = resetData.get("newPassword");
+            authService.resetPassword(userId, newPassword);
+            return ResponseEntity.ok("Mot de passe réinitialisé avec succès");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // GET /api/auth/check-email/{email} - Vérifier si email existe
+    @GetMapping("/check-email/{email}")
+    public ResponseEntity<Boolean> checkEmailExists(@PathVariable String email) {
+        boolean exists = authService.emailExists(email);
+        return ResponseEntity.ok(exists);
+    }
+
+
 }
