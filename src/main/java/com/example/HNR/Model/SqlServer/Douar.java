@@ -1,0 +1,138 @@
+package com.example.HNR.Model.SqlServer;
+
+import com.example.HNR.Model.enums.StatutDouar;
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
+
+import java.util.Date;
+import java.util.List;
+import java.util.ArrayList;
+
+@Entity
+@Table(name = "douars")
+@SQLDelete(sql = "UPDATE douars SET deleted_at = NOW() WHERE douar_id = ?")
+@Where(clause = "deleted_at IS NULL")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Douar {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long douarId;
+
+    @Column(nullable = false, length = 100)
+    private String nom;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private StatutDouar statut;
+
+    @Column(nullable = false, length = 50)
+    private String prefecture;
+
+    @Column(nullable = false, length = 50)
+    private String commune;
+
+    // Relations
+    @OneToMany(mappedBy = "douar", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Action> actions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "douar", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Changement> changements = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mission_id")
+    private Mission mission;
+
+    @Column(name = "created_by_user_id", length = 100)
+    private String createdByUserId;
+
+    // Coordonnées géographiques
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    // Métadonnées
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Date createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private Date updatedAt;
+
+    @Column(name = "deleted_at")
+    private Date deletedAt;
+
+    // Constructeur personnalisé
+    public Douar(String nom, StatutDouar statut, String prefecture, String commune) {
+        this.nom = nom;
+        this.statut = statut;
+        this.prefecture = prefecture;
+        this.commune = commune;
+        this.actions = new ArrayList<>();
+        this.changements = new ArrayList<>();
+    }
+
+    // Méthodes utilitaires
+    public boolean isEradique() {
+        return StatutDouar.ERADIQUE.equals(this.statut);
+    }
+
+    public void eradiquer() {
+        this.statut = StatutDouar.ERADIQUE;
+    }
+
+    public void softDelete() {
+        this.deletedAt = new Date();
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
+
+    public String getFullLocation() {
+        return prefecture + " - " + commune;
+    }
+
+    public void addAction(Action action) {
+        if (this.actions == null) {
+            this.actions = new ArrayList<>();
+        }
+        action.setDouar(this);
+        this.actions.add(action);
+    }
+
+    public void addChangement(Changement changement) {
+        if (this.changements == null) {
+            this.changements = new ArrayList<>();
+        }
+        changement.setDouar(this);
+        this.changements.add(changement);
+    }
+
+    public int getNombreActions() {
+        return (this.actions != null) ? this.actions.size() : 0;
+    }
+
+    public int getNombreChangements() {
+        return (this.changements != null) ? this.changements.size() : 0;
+    }
+
+    public boolean hasCoordinates() {
+        return this.latitude != null && this.longitude != null;
+    }
+}
