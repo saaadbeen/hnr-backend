@@ -6,7 +6,7 @@ import com.example.HNR.Model.SqlServer.Douar;
 import com.example.HNR.Model.enums.TypeExtension;
 import com.example.HNR.Service.ChangementService;
 import com.example.HNR.Repository.SqlServer.DouarRepository;
-import com.example.HNR.Service.FichierService;
+// import com.example.HNR.Service.FichierService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -39,8 +39,9 @@ public class ChangementController {
         d.createdAt       = e.getCreatedAt();
         d.updatedAt       = e.getUpdatedAt();
 
-         var pdfs = fichierService.findByEntity("CHANGEMENT_PDF", e.getChangementId());
-         d.pdfUrl = pdfs.isEmpty() ? null : pdfs.get(0).getUrl();
+        // // Optionnel: dernier PDF attaché
+        // var pdfs = fichierService.findByEntity("CHANGEMENT_PDF", e.getChangementId());
+        // d.pdfUrl = pdfs.isEmpty() ? null : pdfs.get(0).getUrl();
         return d;
     }
 
