@@ -60,10 +60,7 @@ public class ChangementServiceImpl implements ChangementService {
         return changementRepository.findByDateBeforeBetween(startDate, endDate);
     }
 
-    @Override
-    public List<Changement> findChangementsWithPhotos() {
-        return changementRepository.findChangementsWithPhotos();
-    }
+
 
     @Override
     public List<Changement> findBySurfaceMinimum(Double minSurface) {

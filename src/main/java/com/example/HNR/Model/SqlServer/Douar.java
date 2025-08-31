@@ -88,9 +88,6 @@ public class Douar {
     }
 
     // Méthodes utilitaires
-    public boolean isEradique() {
-        return StatutDouar.ERADIQUE.equals(this.statut);
-    }
 
     public void eradiquer() {
         this.statut = StatutDouar.ERADIQUE;
@@ -100,39 +97,7 @@ public class Douar {
         this.deletedAt = new Date();
     }
 
-    public boolean isDeleted() {
-        return this.deletedAt != null;
-    }
 
-    public String getFullLocation() {
-        return prefecture + " - " + commune;
-    }
 
-    public void addAction(Action action) {
-        if (this.actions == null) {
-            this.actions = new ArrayList<>();
-        }
-        action.setDouar(this);
-        this.actions.add(action);
-    }
 
-    public void addChangement(Changement changement) {
-        if (this.changements == null) {
-            this.changements = new ArrayList<>();
-        }
-        changement.setDouar(this);
-        this.changements.add(changement);
-    }
-
-    public int getNombreActions() {
-        return (this.actions != null) ? this.actions.size() : 0;
-    }
-
-    public int getNombreChangements() {
-        return (this.changements != null) ? this.changements.size() : 0;
-    }
-
-    public boolean hasCoordinates() {
-        return this.latitude != null && this.longitude != null;
-    }
 }

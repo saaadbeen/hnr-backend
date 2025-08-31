@@ -46,15 +46,7 @@ public class PVServiceImpl implements PVService {
         return pvRepository.findByRedacteurUserId(userId);
     }
 
-    @Override
-    public List<PV> findByValidateurUserId(String userId) {
-        return pvRepository.findByValidateurUserId(userId);
-    }
 
-    @Override
-    public List<PV> findByValide(boolean valide) {
-        return pvRepository.findByValide(valide);
-    }
 
     @Override
     public Optional<PV> findByActionId(Long actionId) {

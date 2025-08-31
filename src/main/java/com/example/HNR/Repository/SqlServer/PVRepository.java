@@ -16,12 +16,6 @@ public interface PVRepository extends JpaRepository<PV, Long> {
     // Recherche par rédacteur
     List<PV> findByRedacteurUserId(String userId);
 
-    // Recherche par validateur
-    List<PV> findByValidateurUserId(String userId);
-
-    // PV validés
-    List<PV> findByValide(boolean valide);
-
     // Recherche par action
     Optional<PV> findByActionActionId(Long actionId);
 

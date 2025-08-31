@@ -14,8 +14,6 @@ public interface PVService {
 
     // Méthodes métier spécifiques
     List<PV> findByRedacteurUserId(String userId);
-    List<PV> findByValidateurUserId(String userId);
-    List<PV> findByValide(boolean valide);
     Optional<PV> findByActionId(Long actionId);
     List<PV> findByDateRange(Date startDate, Date endDate);
     List<PV> findPVsWithPDF();

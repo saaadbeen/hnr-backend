@@ -76,37 +76,7 @@ public class Action {
         }
     }
 
-    // Constructeur personnalisé
-    public Action(TypeAction type, String userId, Douar douar) {
-        this.type = type;
-        this.userId = userId;
-        this.douar = douar;
-        this.dateAction = new Date();
-        if (douar != null) {
-            this.prefecture = douar.getPrefecture();
-            this.commune = douar.getCommune();
-        }
-    }
-
-    // Méthodes utilitaires
-    public boolean isDemolition() {
-        return TypeAction.DEMOLITION.equals(this.type);
-    }
-
-    public boolean isSignalement() {
-        return TypeAction.SIGNALEMENT.equals(this.type);
-    }
-
-    public boolean isNonDemolition() {
-        return TypeAction.NON_DEMOLITION.equals(this.type);
-    }
-
-    public boolean hasPV() {
-        return this.pv != null;
-    }
 
 
-    public String getFullLocation() {
-        return prefecture + " - " + commune;
-    }
+
 }

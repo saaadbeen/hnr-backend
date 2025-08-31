@@ -1,8 +1,6 @@
 package com.example.HNR.Config;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -23,7 +21,6 @@ public class JwtTokenUtil {
     @Value("${app.jwtExpirationInMs}")
     private long jwtExpirationInMs;
 
-
     private SecretKey getSigningKey() {
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
@@ -32,6 +29,11 @@ public class JwtTokenUtil {
     // Récupérer username du token JWT
     public String getUsernameFromToken(String token) {
         return getClaimFromToken(token, Claims::getSubject);
+    }
+
+    // Alias pour AuthController
+    public String getUserIdFromToken(String token) {
+        return getUsernameFromToken(token);
     }
 
     // Récupérer date d'expiration du token JWT
@@ -58,17 +60,17 @@ public class JwtTokenUtil {
         return expiration.before(new Date());
     }
 
-    // Générer token pour email
-    public String generateToken(String email) {
+    // Générer token pour userId (utilisé dans AuthController)
+    public String generateToken(String userId) {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, email);
+        return createToken(claims, userId);
     }
 
-    // Générer token pour email avec rôle
-    public String generateToken(String email, String role) {
+    // Générer token pour userId avec rôle
+    public String generateToken(String userId, String role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
-        return createToken(claims, email);
+        return createToken(claims, userId);
     }
 
     private String createToken(Map<String, Object> claims, String subject) {
@@ -81,10 +83,23 @@ public class JwtTokenUtil {
                 .compact();
     }
 
-    // Valider token
+    // Valider token (utilisé dans JwtRequestFilter)
     public Boolean validateToken(String token, String username) {
         final String tokenUsername = getUsernameFromToken(token);
         return (tokenUsername.equals(username) && !isTokenExpired(token));
+    }
+
+    // Valider token sans username (utilisé dans AuthController)
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token);
+            return !isTokenExpired(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
     }
 
     // Récupérer le rôle du token

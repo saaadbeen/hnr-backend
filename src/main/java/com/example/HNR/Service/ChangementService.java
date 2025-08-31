@@ -18,6 +18,5 @@ public interface ChangementService {
     List<Changement> findByDouarId(Long douarId);
     List<Changement> findByDetectedByUserId(String userId);
     List<Changement> findByDateRange(Date startDate, Date endDate);
-    List<Changement> findChangementsWithPhotos();
     List<Changement> findBySurfaceMinimum(Double minSurface);
 }

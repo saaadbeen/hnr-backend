@@ -69,16 +69,5 @@ public class Changement {
     @Column(name = "updated_at")
     private Date updatedAt;
 
-    // Méthodes utilitaires
-    public boolean isHorizontal() {
-        return TypeExtension.HORIZONTAL.equals(this.type);
-    }
 
-    public boolean isVertical() {
-        return TypeExtension.VERTICAL.equals(this.type);
-    }
-
-    public boolean hasPhotos() {
-        return this.photoBefore != null && this.photoAfter != null;
-    }
 }
