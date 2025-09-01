@@ -2,21 +2,20 @@ package com.example.HNR.Service;
 
 import com.example.HNR.Model.Mongodb.User;
 import com.example.HNR.Model.enums.Role;
-import com.example.HNR.Repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.HNR.Repository.Mongodb.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder; // Injection du bean
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder; // Injection du bean
 
     @Override
     public User create(User user) {

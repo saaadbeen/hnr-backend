@@ -27,6 +27,9 @@ public interface ActionRepository extends JpaRepository<Action, Long> {
     // Recherche par commune
     List<Action> findByCommune(String commune);
 
+    // Recherche par prefecture et commune
+    List<Action> findByPrefectureAndCommune(String prefecture, String commune);
+
     // Recherche par plage de dates
     List<Action> findByDateActionBetween(Date startDate, Date endDate);
 

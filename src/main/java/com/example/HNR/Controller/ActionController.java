@@ -6,17 +6,18 @@ import com.example.HNR.Model.SqlServer.Douar;
 import com.example.HNR.Model.SqlServer.Mission;
 import com.example.HNR.Model.SqlServer.PV;
 import com.example.HNR.Model.enums.TypeAction;
-import com.example.HNR.Service.ActionService;
 import com.example.HNR.Repository.SqlServer.DouarRepository;
 import com.example.HNR.Repository.SqlServer.MissionRepository;
 import com.example.HNR.Repository.SqlServer.PVRepository;
-
+import com.example.HNR.Service.ActionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,44 +34,50 @@ public class ActionController {
     // ---------- mapping manuel ----------
     private ActionDTO toDto(Action e) {
         ActionDTO d = new ActionDTO();
-        d.actionId   = e.getActionId();
-        d.type       = e.getType();
-        d.prefecture = e.getPrefecture();
-        d.commune    = e.getCommune();
-        d.douarId    = (e.getDouar()   != null ? e.getDouar().getDouarId()       : null);
-        d.missionId  = (e.getMission() != null ? e.getMission().getMissionId()   : null);
-        d.pvId       = (e.getPv()      != null ? e.getPv().getPvId()             : null);
-        d.userId     = e.getUserId();
-        d.dateAction = e.getDateAction();
-        d.createdAt  = e.getCreatedAt();
-        d.updatedAt  = e.getUpdatedAt();
+        d.setActionId(e.getActionId());
+        d.setType(e.getType());
+        d.setPrefecture(e.getPrefecture());
+        d.setCommune(e.getCommune());
+        d.setDouarId(e.getDouar() != null ? e.getDouar().getDouarId() : null);
+        d.setMissionId(e.getMission() != null ? e.getMission().getMissionId() : null);
+        d.setPvId(e.getPv() != null ? e.getPv().getPvId() : null);
+        d.setUserId(e.getUserId());
+        d.setDateAction(e.getDateAction());
+        d.setCreatedAt(e.getCreatedAt());
+        d.setUpdatedAt(e.getUpdatedAt());
+        // nouveaux champs photos
+        d.setPhotoAvantUrl(e.getPhotoAvantUrl());
+        d.setPhotoApresUrl(e.getPhotoApresUrl());
         return d;
     }
 
     private Action fromDto(ActionDTO d) {
         Action e = new Action();
-        e.setActionId(d.actionId);
-        e.setType(d.type);
-        e.setPrefecture(d.prefecture);
-        e.setCommune(d.commune);
-        e.setUserId(d.userId);
-        e.setDateAction(d.dateAction);
+        e.setActionId(d.getActionId());
+        e.setType(d.getType());
+        e.setPrefecture(d.getPrefecture());
+        e.setCommune(d.getCommune());
+        e.setUserId(d.getUserId());
+        e.setDateAction(d.getDateAction());
+        // nouveaux champs photos
+        e.setPhotoAvantUrl(d.getPhotoAvantUrl());
+        e.setPhotoApresUrl(d.getPhotoApresUrl());
 
-        if (d.douarId != null) {
-            Douar douar = douarRepository.findById(d.douarId)
-                    .orElseThrow(() -> new IllegalArgumentException("Douar introuvable: " + d.douarId));
+        if (d.getDouarId() != null) {
+            Douar douar = douarRepository.findById(d.getDouarId())
+                    .orElseThrow(() -> new IllegalArgumentException("Douar introuvable: " + d.getDouarId()));
             e.setDouar(douar);
         } else e.setDouar(null);
 
-        if (d.missionId != null) {
-            Mission mission = missionRepository.findById(d.missionId)
-                    .orElseThrow(() -> new IllegalArgumentException("Mission introuvable: " + d.missionId));
+        if (d.getMissionId() != null) {
+            Mission mission = missionRepository.findById(d.getMissionId())
+                    .orElseThrow(() -> new IllegalArgumentException("Mission introuvable: " + d.getMissionId()));
             e.setMission(mission);
         } else e.setMission(null);
 
-        if (d.pvId != null) {
-            PV pv = pvRepository.findById(d.pvId)
-                    .orElseThrow(() -> new IllegalArgumentException("PV introuvable: " + d.pvId));
+        if (d.getPvId() != null) {
+            PV pv = pvRepository.findById(d.getPvId())
+                    .orElseThrow(() -> new IllegalArgumentException("PV introuvable: " + d.getPvId()));
             e.setPv(pv);
         } else e.setPv(null);
 
@@ -102,7 +109,11 @@ public class ActionController {
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ActionDTO> createAction(@RequestBody ActionDTO dto) {
         try {
-            if (dto.dateAction == null) dto.dateAction = new Date();
+            // Validation minimale des champs obligatoires
+            if (dto == null || dto.getDouarId() == null || dto.getUserId() == null || dto.getType() == null) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            }
+            if (dto.getDateAction() == null) dto.setDateAction(new Date());
             var saved = actionService.create(fromDto(dto));
             return new ResponseEntity<>(toDto(saved), HttpStatus.CREATED);
         } catch (IllegalArgumentException notFound) {
@@ -119,7 +130,7 @@ public class ActionController {
             var existing = actionService.findById(id);
             if (existing.isEmpty()) return ResponseEntity.notFound().build();
 
-            dto.actionId = id;
+            dto.setActionId(id);
             var entity = fromDto(dto);
             entity.setCreatedAt(existing.get().getCreatedAt());
 
@@ -142,7 +153,7 @@ public class ActionController {
         } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
     }
 
-    // Filtres — maintenant en DTO
+    // ========= Filtres =========
     @GetMapping("/type/{type}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ActionDTO>> getActionsByType(@PathVariable TypeAction type) {
@@ -226,5 +237,61 @@ public class ActionController {
             var dtos = actionService.findByType(TypeAction.SIGNALEMENT).stream().map(this::toDto).toList();
             return ResponseEntity.ok(dtos);
         } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+    }
+
+    // ========= Upload photos =========
+
+    @PostMapping("/{id}/photo-avant")
+    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+    public ResponseEntity<ActionDTO> uploadPhotoAvant(@PathVariable Long id,
+                                                      @RequestParam("file") MultipartFile file) {
+        try {
+            var opt = actionService.findById(id);
+            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+
+            String url = saveActionFile(id, file, "avant");
+            var action = opt.get();
+            action.setPhotoAvantUrl(url);
+            var saved = actionService.update(action);
+
+            return ResponseEntity.ok(toDto(saved));
+        } catch (Exception ex) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/{id}/photo-apres")
+    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+    public ResponseEntity<ActionDTO> uploadPhotoApres(@PathVariable Long id,
+                                                      @RequestParam("file") MultipartFile file) {
+        try {
+            var opt = actionService.findById(id);
+            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+
+            String url = saveActionFile(id, file, "apres");
+            var action = opt.get();
+            action.setPhotoApresUrl(url);
+            var saved = actionService.update(action);
+
+            return ResponseEntity.ok(toDto(saved));
+        } catch (Exception ex) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // --- utilitaire local pour sauvegarder un fichier uploadé ---
+    private String saveActionFile(Long id, MultipartFile file, String slot) throws Exception {
+        String original = Optional.ofNullable(file.getOriginalFilename()).orElse("image");
+        String ext = original.contains(".") ? original.substring(original.lastIndexOf('.')) : ".jpg";
+        String filename = slot + "-" + System.currentTimeMillis() + ext;
+
+        Path uploadRoot = Paths.get("uploads", "actions", id.toString());
+        Files.createDirectories(uploadRoot);
+
+        Path target = uploadRoot.resolve(filename);
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+        // Retourne l'URL publique (assure-toi d'exposer /files/** -> dossier "uploads/")
+        return "/files/actions/" + id + "/" + filename;
     }
 }

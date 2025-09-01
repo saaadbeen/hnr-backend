@@ -30,30 +30,16 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-// ⚠️ Chez toi ces classes sont dans com.example.HNR.Config
-import com.example.HNR.Config.JwtRequestFilter;
-import com.example.HNR.Config.JwtAuthenticationEntryPoint;
-import com.example.HNR.Config.CustomUserDetailsService;
-
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    private final JwtRequestFilter jwtRequestFilter;
-    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    private final CustomUserDetailsService customUserDetailsService;
-
-    public SecurityConfig(JwtRequestFilter jwtRequestFilter,
-                          JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
-                          CustomUserDetailsService customUserDetailsService) {
-        this.jwtRequestFilter = jwtRequestFilter;
-        this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
-        this.customUserDetailsService = customUserDetailsService;
-    }
-
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                  JwtRequestFilter jwtRequestFilter,
+                                                  JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
+                                                  DaoAuthenticationProvider daoAuthenticationProvider) throws Exception {
         http
                 // API stateless (JWT)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -77,14 +63,14 @@ public class SecurityConfig {
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         // Provider d’auth basé sur UserDetailsService + BCrypt
-        http.authenticationProvider(daoAuthenticationProvider());
-
+        http.authenticationProvider(daoAuthenticationProvider);
+        
         return http.build();
     }
 
     // UserDetailsService = ton CustomUserDetailsService (déjà @Service)
     @Bean
-    public UserDetailsService userDetailsService() {
+    public UserDetailsService userDetailsService(CustomUserDetailsService customUserDetailsService) {
         return customUserDetailsService;
     }
 
@@ -95,10 +81,11 @@ public class SecurityConfig {
 
     // DaoAuthenticationProvider (non déprécié; warning IDE possible mais sans impact)
     @Bean
-    public DaoAuthenticationProvider daoAuthenticationProvider() {
+    public DaoAuthenticationProvider daoAuthenticationProvider(UserDetailsService userDetailsService,
+                                                               PasswordEncoder passwordEncoder) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(customUserDetailsService);
-        provider.setPasswordEncoder(passwordEncoder());
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
         return provider;
     }
 

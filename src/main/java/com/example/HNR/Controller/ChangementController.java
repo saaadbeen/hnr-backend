@@ -24,7 +24,7 @@ public class ChangementController {
 
     @Autowired private ChangementService changementService;
     @Autowired private DouarRepository douarRepository;
-    // @Autowired private FichierService fichierService; // <- si tu veux pdfUrl
+    @Autowired private FichierService fichierService; // pour recuperer les PDF associes
 
     // ---------- mapping manuel ----------
     private ChangementDTO toDto(Changement e) {

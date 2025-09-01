@@ -1,22 +1,22 @@
 package com.example.HNR.DTO;
 
 import com.example.HNR.Model.enums.TypeAction;
-import lombok.Data;
-import java.util.Date;
+import lombok.*;
 
-@Data
+import java.util.Date;
+@Data @NoArgsConstructor @AllArgsConstructor @Builder
 public class ActionDTO {
-    private Long id;
-    private String titre;
-    private String description;
-    private TypeAction type;
-    private String prefecture;
-    private String commune;
+    public Long actionId;
+    public TypeAction type;
+    public String prefecture;
+    public String commune;
     public Long douarId;           // relation -> id
     public Long missionId;
     public Long pvId;              // relation -> id
-
     public String userId;
-    private Date createdAt;
-    private Date updatedAt;
+    public Date dateAction;
+    public Date createdAt;
+    public Date updatedAt;
+    private String photoAvantUrl;
+    private String photoApresUrl;
 }

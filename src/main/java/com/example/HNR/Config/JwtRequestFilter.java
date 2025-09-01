@@ -1,8 +1,7 @@
 
 package com.example.HNR.Config;
 
-import com.example.HNR.Service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,13 +18,10 @@ import java.util.Arrays;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class JwtRequestFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JwtTokenUtil jwtTokenUtil;
-
-    @Autowired
-    private UserService userService;
+    private final JwtTokenUtil jwtTokenUtil;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -82,8 +78,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     }
 
     private boolean isPublicEndpoint(String uri) {
-        return uri.startsWith("/api/auth/login") ||
-                uri.startsWith("/api/auth/register") ||
-                uri.startsWith("/api/auth/test-password");
+        // Laisser passer tous les endpoints d'authentification
+        return uri.startsWith("/api/auth/");
     }
 }

@@ -57,7 +57,15 @@ public class ActionServiceImpl implements ActionService {
 
     @Override
     public List<Action> findByLocation(String prefecture, String commune) {
-        return actionRepository.findByCommune(commune);
+        if (prefecture != null && commune != null) {
+            return actionRepository.findByPrefectureAndCommune(prefecture, commune);
+        } else if (prefecture != null) {
+            return actionRepository.findByPrefecture(prefecture);
+        } else if (commune != null) {
+            return actionRepository.findByCommune(commune);
+        } else {
+            return actionRepository.findAll();
+        }
     }
 
     @Override

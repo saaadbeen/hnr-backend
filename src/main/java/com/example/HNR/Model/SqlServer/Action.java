@@ -65,7 +65,11 @@ public class Action {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Date updatedAt;
+    @Column(name = "photo_avant_url", length = 512)
+    private String photoAvantUrl;
 
+    @Column(name = "photo_apres_url", length = 512)
+    private String photoApresUrl;
     // Callbacks JPA
     @PrePersist
     @PreUpdate

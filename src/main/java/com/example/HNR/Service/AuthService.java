@@ -4,7 +4,7 @@ import com.example.HNR.Config.JwtTokenUtil;
 import com.example.HNR.DTO.UserDTO;
 import com.example.HNR.Model.Mongodb.User;
 import com.example.HNR.Model.enums.Role;
-import com.example.HNR.Repository.UserRepository;
+import com.example.HNR.Repository.Mongodb.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;

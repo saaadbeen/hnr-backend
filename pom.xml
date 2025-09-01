@@ -137,6 +137,7 @@
 					<failOnError>false</failOnError> <!-- désactive l’échec si un fichier reste -->
 				</configuration>
 			</plugin>
+
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>

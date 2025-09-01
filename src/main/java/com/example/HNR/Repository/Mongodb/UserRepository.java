@@ -1,9 +1,8 @@
-package com.example.HNR.Repository;
+package com.example.HNR.Repository.Mongodb;
 
 import com.example.HNR.Model.Mongodb.User;
 import com.example.HNR.Model.enums.Role;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
 import java.util.List;

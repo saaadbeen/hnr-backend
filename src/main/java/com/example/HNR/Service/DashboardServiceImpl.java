@@ -9,7 +9,7 @@ import com.example.HNR.Repository.SqlServer.DouarRepository;
 import com.example.HNR.Repository.SqlServer.MissionRepository;
 import com.example.HNR.Repository.SqlServer.PVRepository;
 import com.example.HNR.Repository.SqlServer.ChangementRepository;
-import com.example.HNR.Repository.UserRepository;
+import com.example.HNR.Repository.Mongodb.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.*;

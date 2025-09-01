@@ -14,6 +14,5 @@ public class ChangementDTO {
     public Date   createdAt;
     public Date   updatedAt;
 
-    // optionnel: pour afficher direct un lien PDF (sinon, le front lira /api/fichiers/…)
     public String pdfUrl;
 }
