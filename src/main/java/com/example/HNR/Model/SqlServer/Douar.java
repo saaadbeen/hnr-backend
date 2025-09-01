@@ -9,7 +9,6 @@ import lombok.Builder;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
 
 import java.util.Date;
 import java.util.List;
@@ -17,8 +16,7 @@ import java.util.ArrayList;
 
 @Entity
 @Table(name = "douars")
-@SQLDelete(sql = "UPDATE douars SET deleted_at = NOW() WHERE douar_id = ?")
-@Where(clause = "deleted_at IS NULL")
+@SQLDelete(sql = "UPDATE douars SET deleted_at = GETDATE() WHERE douar_id = ?")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

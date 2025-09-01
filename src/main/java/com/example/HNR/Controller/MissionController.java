@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @RestController
 @RequestMapping("/api/missions")
@@ -23,8 +26,9 @@ public class MissionController {
     // GET all missions - accessible à tous les rôles authentifiés
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Mission>> getAllMissions() {
-        List<Mission> missions = missionService.findAll();
+    public ResponseEntity<Page<Mission>> getAllMissions(@RequestParam(defaultValue = "0") int page,
+                                                        @RequestParam(defaultValue = "10") int size) {
+        Page<Mission> missions = missionService.findAll(PageRequest.of(page, size));
         return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
@@ -164,7 +168,7 @@ public class MissionController {
                 .getContext().getAuthentication().getName();
 
         // Récupérer toutes les missions et filtrer celles assignées à l'utilisateur connecté
-        List<Mission> allMissions = missionService.findAll();
+        List<Mission> allMissions = missionService.findAll(Pageable.unpaged()).getContent();
         List<Mission> assignedMissions = allMissions.stream()
                 .filter(mission -> mission.getAssignedUserIds() != null &&
                         mission.getAssignedUserIds().contains(currentUserId))

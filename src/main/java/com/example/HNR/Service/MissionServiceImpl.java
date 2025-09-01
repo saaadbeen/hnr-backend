@@ -4,6 +4,8 @@ import com.example.HNR.Model.SqlServer.Mission;
 import com.example.HNR.Repository.SqlServer.MissionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -25,8 +27,8 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
-    public List<Mission> findAll() {
-        return missionRepository.findAll();
+    public Page<Mission> findAll(Pageable pageable) {
+        return missionRepository.findAll(pageable);
     }
 
     @Override
@@ -46,7 +48,15 @@ public class MissionServiceImpl implements MissionService {
 
     @Override
     public List<Mission> findByLocation(String prefecture, String commune) {
-        return missionRepository.findByCommune(commune);
+        if (prefecture != null && commune != null) {
+            return missionRepository.findByPrefectureAndCommune(prefecture, commune);
+        } else if (prefecture != null) {
+            return missionRepository.findByPrefecture(prefecture);
+        } else if (commune != null) {
+            return missionRepository.findByCommune(commune);
+        } else {
+            return missionRepository.findAll();
+        }
     }
 
     @Override

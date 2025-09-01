@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -59,7 +60,7 @@ public class AuthController {
         response.put("user", userInfo);
         return ResponseEntity.ok(response);
     }
-
+    @PreAuthorize("hasRole('MEMBRE_DSI')")
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest registerRequest) {
         Map<String, Object> response = new HashMap<>();
@@ -72,6 +73,7 @@ public class AuthController {
         User newUser = new User();
         newUser.setFullName(registerRequest.getFullName());
         newUser.setEmail(registerRequest.getEmail());
+        // L'encodage est géré dans UserServiceImpl#create pour éviter le double encodage
         newUser.setPassword(registerRequest.getPassword());
         newUser.setRole(registerRequest.getRole());
         newUser.setPrefecture(registerRequest.getPrefecture());

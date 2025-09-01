@@ -4,11 +4,13 @@ import com.example.HNR.Model.SqlServer.Mission;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface MissionService {
     Mission create(Mission mission);
     Optional<Mission> findById(Long id);
-    List<Mission> findAll();
+    Page<Mission> findAll(Pageable pageable);
     Mission update(Mission mission);
     void delete(Long id);
 

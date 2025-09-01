@@ -10,6 +10,8 @@ import com.example.HNR.Repository.SqlServer.DouarRepository;
 import com.example.HNR.Repository.SqlServer.MissionRepository;
 import com.example.HNR.Repository.SqlServer.PVRepository;
 import com.example.HNR.Service.ActionService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
@@ -18,10 +20,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.example.HNR.Util.FileUtils;
 import org.springframework.web.server.ResponseStatusException;
-
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/actions")
@@ -88,8 +88,10 @@ public class ActionController {
 
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<ActionDTO>> getAllActions() {
-        var dtos = actionService.findAll().stream().map(this::toDto).collect(Collectors.toList());
+    public ResponseEntity<Page<ActionDTO>> getAllActions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        var dtos = actionService.findAll(PageRequest.of(page, size)).map(this::toDto);
         return ResponseEntity.ok(dtos);
     }
 
@@ -104,11 +106,15 @@ public class ActionController {
 
     @PostMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<ActionDTO> createAction(@RequestBody ActionDTO dto) {
+    public ResponseEntity<ActionDTO> createAction( @RequestBody ActionDTO dto) {
         // Validation minimale des champs obligatoires
-        if (dto == null || dto.getDouarId() == null || dto.getUserId() == null || dto.getType() == null) {
+        if (dto == null || dto.getDouarId() == null || dto.getType() == null) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
+        // Forcer l'ID utilisateur depuis le contexte de sécurité
+        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getName();
+        dto.setUserId(currentUserId);
         if (dto.getDateAction() == null) dto.setDateAction(new Date());
         var saved = actionService.create(fromDto(dto));
         return new ResponseEntity<>(toDto(saved), HttpStatus.CREATED);
@@ -116,7 +122,7 @@ public class ActionController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@actionServiceImpl.findById(#id).isPresent() and @actionServiceImpl.findById(#id).get().getUserId() == authentication.name)")
-    public ResponseEntity<ActionDTO> updateAction(@PathVariable Long id, @RequestBody ActionDTO dto) {
+    public ResponseEntity<ActionDTO> updateAction(@PathVariable Long id,  @RequestBody ActionDTO dto) {
         var existing = actionService.findById(id);
         if (existing.isEmpty()) return ResponseEntity.notFound().build();
 

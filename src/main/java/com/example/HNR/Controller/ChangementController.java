@@ -13,9 +13,11 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.*;
-import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 @RestController
 @RequestMapping("/api/changements")
@@ -65,8 +67,10 @@ public class ChangementController {
 
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<ChangementDTO>> getAllChangements() {
-        var dtos = changementService.findAll().stream().map(this::toDto).collect(Collectors.toList());
+    public ResponseEntity<Page<ChangementDTO>> getAllChangements(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        var dtos = changementService.findAll(PageRequest.of(page, size)).map(this::toDto);
         return ResponseEntity.ok(dtos);
     }
 
@@ -81,7 +85,7 @@ public class ChangementController {
 
     @PostMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<ChangementDTO> createChangement(@RequestBody ChangementDTO dto) {
+    public ResponseEntity<ChangementDTO> createChangement(@Valid @RequestBody ChangementDTO dto) {
         if (dto.dateBefore == null) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
@@ -91,7 +95,7 @@ public class ChangementController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@changementServiceImpl.findById(#id).isPresent() and @changementServiceImpl.findById(#id).get().getDetectedByUserId() == authentication.name)")
-    public ResponseEntity<ChangementDTO> updateChangement(@PathVariable Long id, @RequestBody ChangementDTO dto) {
+    public ResponseEntity<ChangementDTO> updateChangement(@PathVariable Long id, @Valid @RequestBody ChangementDTO dto) {
         var existing = changementService.findById(id);
         if (existing.isEmpty()) return ResponseEntity.notFound().build();
 

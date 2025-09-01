@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @RestController
 @RequestMapping("/api/pvs")
@@ -23,8 +26,9 @@ public class PVController {
     // GET all PVs - accessible à tous les rôles authentifiés
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<PV>> getAllPVs() {
-        List<PV> pvs = pvService.findAll();
+    public ResponseEntity<Page<PV>> getAllPVs(@RequestParam(defaultValue = "0") int page,
+                                              @RequestParam(defaultValue = "10") int size) {
+        Page<PV> pvs = pvService.findAll(PageRequest.of(page, size));
         return new ResponseEntity<>(pvs, HttpStatus.OK);
     }
 
@@ -162,7 +166,7 @@ public class PVController {
     @GetMapping("/recent")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<PV>> getRecentPVs() {
-        List<PV> pvs = pvService.findAll(); // Le service peut implémenter un ordre par défaut
+        List<PV> pvs = pvService.findAll(Pageable.unpaged()).getContent(); // Le service peut implémenter un ordre par défaut
         // Trier par date de rédaction décroissante
         pvs.sort((pv1, pv2) -> pv2.getDateRedaction().compareTo(pv1.getDateRedaction()));
 

@@ -12,6 +12,8 @@ public class DouarDTO {
     private StatutDouar statut;
     private String prefecture;
     private String commune;
+    private Double latitude;
+    private Double longitude;
     private Long missionId;       // si Douar -> Mission (ManyToOne) existe
     private String createdByUserId;
     private Date createdAt;

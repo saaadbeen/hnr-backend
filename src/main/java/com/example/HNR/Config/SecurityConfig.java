@@ -53,6 +53,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Preflight CORS
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // Fichiers statiques exposés par WebMvcConfigurer
+                        .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
                         // Auth publique
                         .requestMatchers("/api/auth/**").permitAll()
                         // (Option DEV) ouvrir temporairement toute l’API :

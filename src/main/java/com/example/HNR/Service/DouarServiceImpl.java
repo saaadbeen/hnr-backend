@@ -5,6 +5,8 @@ import com.example.HNR.Model.enums.StatutDouar;
 import com.example.HNR.Repository.SqlServer.DouarRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,8 +27,8 @@ public class DouarServiceImpl implements DouarService {
     }
 
     @Override
-    public List<Douar> findAll() {
-        return douarRepository.findAll();
+    public Page<Douar> findAll(Pageable pageable) {
+        return douarRepository.findAll(pageable);
     }
 
     @Override

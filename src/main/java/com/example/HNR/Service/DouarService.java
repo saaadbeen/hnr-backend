@@ -4,11 +4,13 @@ import com.example.HNR.Model.SqlServer.Douar;
 import com.example.HNR.Model.enums.StatutDouar;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface DouarService {
     Douar create(Douar douar);
     Optional<Douar> findById(Long id);
-    List<Douar> findAll();
+    Page<Douar> findAll(Pageable pageable);
     Douar update(Douar douar);
     void delete(Long id);
 

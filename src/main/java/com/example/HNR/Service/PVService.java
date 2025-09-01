@@ -4,11 +4,13 @@ import com.example.HNR.Model.SqlServer.PV;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface PVService {
     PV create(PV pv);
     Optional<PV> findById(Long id);
-    List<PV> findAll();
+    Page<PV> findAll(Pageable pageable);
     PV update(PV pv);
     void delete(Long id);
 

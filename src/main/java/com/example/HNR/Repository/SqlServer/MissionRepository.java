@@ -19,6 +19,9 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
     // Recherche par commune
     List<Mission> findByCommune(String commune);
 
+    // Recherche par prefecture et commune
+    List<Mission> findByPrefectureAndCommune(String prefecture, String commune);
+
     // Recherche par créateur
     List<Mission> findByCreatedByUserId(String userId);
 

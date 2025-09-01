@@ -4,11 +4,13 @@ import com.example.HNR.Model.Mongodb.User;
 import com.example.HNR.Model.enums.Role;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface UserService {
     User create(User user);
     Optional<User> findById(String id);
-    List<User> findAll();
+    Page<User> findAll(Pageable pageable);
     User update(User user);
     void delete(String id);
 

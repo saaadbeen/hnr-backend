@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 @RestController
 @RequestMapping("/api/fichiers")
@@ -22,8 +24,9 @@ public class FichierController {
     // GET all fichiers - accessible à tous les rôles authentifiés
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getAllFichiers() {
-        List<Fichier> fichiers = fichierService.findAll();
+    public ResponseEntity<Page<Fichier>> getAllFichiers(@RequestParam(defaultValue = "0") int page,
+                                                        @RequestParam(defaultValue = "10") int size) {
+        Page<Fichier> fichiers = fichierService.findAll(PageRequest.of(page, size));
         return new ResponseEntity<>(fichiers, HttpStatus.OK);
     }
 
@@ -44,10 +47,16 @@ public class FichierController {
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<Fichier> createFichier(@RequestBody Fichier fichier) {
         // Validation basique
+        if (fichier == null) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
         if (fichier.getFileName() == null || fichier.getFileName().trim().isEmpty()) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
-        if (fichier.getFilePath() == null || fichier.getUrl() == null) {
+        if (fichier.getFilePath() == null || fichier.getFilePath().trim().isEmpty()
+                || fichier.getUrl() == null || fichier.getUrl().trim().isEmpty()
+                || fichier.getContentType() == null || fichier.getContentType().trim().isEmpty()
+                || fichier.getSize() == null || fichier.getSize() < 0) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
         if (fichier.getUploadedByUserId() == null || fichier.getUploadedByUserId().trim().isEmpty()) {

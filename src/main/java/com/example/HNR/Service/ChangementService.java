@@ -5,11 +5,13 @@ import com.example.HNR.Model.enums.TypeExtension;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface ChangementService {
     Changement create(Changement changement);
     Optional<Changement> findById(Long id);
-    List<Changement> findAll();
+    Page<Changement> findAll(Pageable pageable);
     Changement update(Changement changement);
     void delete(Long id);
 
