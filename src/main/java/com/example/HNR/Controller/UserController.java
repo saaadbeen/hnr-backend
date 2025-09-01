@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Optional;
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"})
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
@@ -18,26 +17,18 @@ public class UserController {
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI')")
     public ResponseEntity<List<User>> getAllUsers() {
-        try {
-            List<User> users = userService.findAll();
-            return new ResponseEntity<>(users, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<User> users = userService.findAll();
+        return new ResponseEntity<>(users, HttpStatus.OK);
     }
     // GET user by id
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@userServiceImpl.findById(#id).isPresent() and @userServiceImpl.findById(#id).get().getEmail() == authentication.name)")
     public ResponseEntity<User> getUserById(@PathVariable String id) {
-        try {
-            Optional<User> user = userService.findById(id);
-            if (user.isPresent()) {
-                return new ResponseEntity<>(user.get(), HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        Optional<User> user = userService.findById(id);
+        if (user.isPresent()) {
+            return new ResponseEntity<>(user.get(), HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
     // GET users by location
@@ -46,22 +37,14 @@ public class UserController {
     public ResponseEntity<List<User>> getUsersByLocation(
             @RequestParam String prefecture,
             @RequestParam String commune) {
-        try {
-            List<User> users = userService.findByLocation(prefecture, commune);
-            return new ResponseEntity<>(users, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<User> users = userService.findByLocation(prefecture, commune);
+        return new ResponseEntity<>(users, HttpStatus.OK);
     }
     // GET check if email exists
     @GetMapping("/exists/{email}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI')")
     public ResponseEntity<Boolean> checkEmailExists(@PathVariable String email) {
-        try {
-            boolean exists = userService.existsByEmail(email);
-            return new ResponseEntity<>(exists, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        boolean exists = userService.existsByEmail(email);
+        return new ResponseEntity<>(exists, HttpStatus.OK);
     }
 }

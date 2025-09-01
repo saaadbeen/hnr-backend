@@ -101,8 +101,12 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         // DEV : front React
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
-        // PROD : préfère setAllowedOriginPatterns(List.of("https://ton-domaine.tld"))
+        config.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:3001"
+        ));
+
 
         config.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

@@ -16,6 +16,8 @@ import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import com.example.HNR.Util.FileUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.*;
 import java.util.*;
@@ -23,7 +25,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/actions")
-@CrossOrigin(origins = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"})
 public class ActionController {
 
     @Autowired private ActionService actionService;
@@ -88,106 +89,80 @@ public class ActionController {
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ActionDTO>> getAllActions() {
-        try {
-            var dtos = actionService.findAll().stream().map(this::toDto).collect(Collectors.toList());
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = actionService.findAll().stream().map(this::toDto).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ActionDTO> getActionById(@PathVariable Long id) {
-        try {
-            return actionService.findById(id)
-                    .map(this::toDto)
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        return actionService.findById(id)
+                .map(this::toDto)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ActionDTO> createAction(@RequestBody ActionDTO dto) {
-        try {
-            // Validation minimale des champs obligatoires
-            if (dto == null || dto.getDouarId() == null || dto.getUserId() == null || dto.getType() == null) {
-                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-            }
-            if (dto.getDateAction() == null) dto.setDateAction(new Date());
-            var saved = actionService.create(fromDto(dto));
-            return new ResponseEntity<>(toDto(saved), HttpStatus.CREATED);
-        } catch (IllegalArgumentException notFound) {
+        // Validation minimale des champs obligatoires
+        if (dto == null || dto.getDouarId() == null || dto.getUserId() == null || dto.getType() == null) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
+        if (dto.getDateAction() == null) dto.setDateAction(new Date());
+        var saved = actionService.create(fromDto(dto));
+        return new ResponseEntity<>(toDto(saved), HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@actionServiceImpl.findById(#id).isPresent() and @actionServiceImpl.findById(#id).get().getUserId() == authentication.name)")
     public ResponseEntity<ActionDTO> updateAction(@PathVariable Long id, @RequestBody ActionDTO dto) {
-        try {
-            var existing = actionService.findById(id);
-            if (existing.isEmpty()) return ResponseEntity.notFound().build();
+        var existing = actionService.findById(id);
+        if (existing.isEmpty()) return ResponseEntity.notFound().build();
 
-            dto.setActionId(id);
-            var entity = fromDto(dto);
-            entity.setCreatedAt(existing.get().getCreatedAt());
+        dto.setActionId(id);
+        var entity = fromDto(dto);
+        entity.setCreatedAt(existing.get().getCreatedAt());
 
-            var saved = actionService.update(entity);
-            return ResponseEntity.ok(toDto(saved));
-        } catch (IllegalArgumentException notFound) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        var saved = actionService.update(entity);
+        return ResponseEntity.ok(toDto(saved));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI')")
     public ResponseEntity<Void> deleteAction(@PathVariable Long id) {
-        try {
-            if (actionService.findById(id).isEmpty()) return ResponseEntity.notFound().build();
-            actionService.delete(id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        if (actionService.findById(id).isEmpty()) return ResponseEntity.notFound().build();
+        actionService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     // ========= Filtres =========
     @GetMapping("/type/{type}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ActionDTO>> getActionsByType(@PathVariable TypeAction type) {
-        try {
-            var dtos = actionService.findByType(type).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = actionService.findByType(type).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/user/{userId}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or #userId == authentication.name")
     public ResponseEntity<List<ActionDTO>> getActionsByUserId(@PathVariable String userId) {
-        try {
-            var dtos = actionService.findByUserId(userId).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = actionService.findByUserId(userId).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/douar/{douarId}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ActionDTO>> getActionsByDouarId(@PathVariable Long douarId) {
-        try {
-            var dtos = actionService.findByDouarId(douarId).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = actionService.findByDouarId(douarId).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/location")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ActionDTO>> getActionsByLocation(@RequestParam String prefecture, @RequestParam String commune) {
-        try {
-            var dtos = actionService.findByLocation(prefecture, commune).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = actionService.findByLocation(prefecture, commune).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/date-range")
@@ -195,48 +170,38 @@ public class ActionController {
     public ResponseEntity<List<ActionDTO>> getActionsByDateRange(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
-        try {
-            var dtos = actionService.findByDateRange(startDate, endDate).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = actionService.findByDateRange(startDate, endDate).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/with-pv")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ActionDTO>> getActionsWithPV() {
-        try {
-            var dtos = actionService.findActionsWithPV().stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = actionService.findActionsWithPV().stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/my-actions")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ActionDTO>> getMyActions() {
-        try {
-            String currentUserId = org.springframework.security.core.context.SecurityContextHolder
-                    .getContext().getAuthentication().getName();
-            var dtos = actionService.findByUserId(currentUserId).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getName();
+        var dtos = actionService.findByUserId(currentUserId).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/demolitions")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ActionDTO>> getDemolitions() {
-        try {
-            var dtos = actionService.findByType(TypeAction.DEMOLITION).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = actionService.findByType(TypeAction.DEMOLITION).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/signalements")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ActionDTO>> getSignalements() {
-        try {
-            var dtos = actionService.findByType(TypeAction.SIGNALEMENT).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = actionService.findByType(TypeAction.SIGNALEMENT).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     // ========= Upload photos =========
@@ -244,46 +209,43 @@ public class ActionController {
     @PostMapping("/{id}/photo-avant")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ActionDTO> uploadPhotoAvant(@PathVariable Long id,
-                                                      @RequestParam("file") MultipartFile file) {
-        try {
-            var opt = actionService.findById(id);
-            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+                                                      @RequestParam("file") MultipartFile file) throws Exception {
+        var opt = actionService.findById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
-            String url = saveActionFile(id, file, "avant");
-            var action = opt.get();
-            action.setPhotoAvantUrl(url);
-            var saved = actionService.update(action);
+        String url = saveActionFile(id, file, "avant");
+        var action = opt.get();
+        action.setPhotoAvantUrl(url);
+        var saved = actionService.update(action);
 
-            return ResponseEntity.ok(toDto(saved));
-        } catch (Exception ex) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return ResponseEntity.ok(toDto(saved));
     }
 
     @PostMapping("/{id}/photo-apres")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ActionDTO> uploadPhotoApres(@PathVariable Long id,
-                                                      @RequestParam("file") MultipartFile file) {
-        try {
-            var opt = actionService.findById(id);
-            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+                                                      @RequestParam("file") MultipartFile file) throws Exception {
+        var opt = actionService.findById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
-            String url = saveActionFile(id, file, "apres");
-            var action = opt.get();
-            action.setPhotoApresUrl(url);
-            var saved = actionService.update(action);
+        String url = saveActionFile(id, file, "apres");
+        var action = opt.get();
+        action.setPhotoApresUrl(url);
+        var saved = actionService.update(action);
 
-            return ResponseEntity.ok(toDto(saved));
-        } catch (Exception ex) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return ResponseEntity.ok(toDto(saved));
     }
 
     // --- utilitaire local pour sauvegarder un fichier uploadé ---
     private String saveActionFile(Long id, MultipartFile file, String slot) throws Exception {
+        if (!FileUtils.isValidFileType(file) || !FileUtils.isValidFileSize(file)) {
+
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid file");
+        }
         String original = Optional.ofNullable(file.getOriginalFilename()).orElse("image");
-        String ext = original.contains(".") ? original.substring(original.lastIndexOf('.')) : ".jpg";
-        String filename = slot + "-" + System.currentTimeMillis() + ext;
+        String filename = slot + "-" + FileUtils.generateUniqueFileName(original);
+
+
 
         Path uploadRoot = Paths.get("uploads", "actions", id.toString());
         Files.createDirectories(uploadRoot);

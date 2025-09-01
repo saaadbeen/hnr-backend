@@ -15,7 +15,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/missions")
-@CrossOrigin(origins = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"})
 public class MissionController {
 
     @Autowired
@@ -25,27 +24,19 @@ public class MissionController {
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Mission>> getAllMissions() {
-        try {
-            List<Mission> missions = missionService.findAll();
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findAll();
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // GET mission by id
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<Mission> getMissionById(@PathVariable Long id) {
-        try {
-            Optional<Mission> mission = missionService.findById(id);
-            if (mission.isPresent()) {
-                return new ResponseEntity<>(mission.get(), HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        Optional<Mission> mission = missionService.findById(id);
+        if (mission.isPresent()) {
+            return new ResponseEntity<>(mission.get(), HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -53,47 +44,39 @@ public class MissionController {
     @PostMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI')")
     public ResponseEntity<Mission> createMission(@RequestBody Mission mission) {
-        try {
-            // Validation basique
-            if (mission.getPrefecture() == null || mission.getCommune() == null) {
-                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-            }
-            if (mission.getDateEnvoi() == null) {
-                mission.setDateEnvoi(new Date());
-            }
-            if (mission.getStatut() == null || mission.getStatut().trim().isEmpty()) {
-                mission.setStatut("EN_COURS"); // Statut par défaut
-            }
-
-            Mission savedMission = missionService.create(mission);
-            return new ResponseEntity<>(savedMission, HttpStatus.CREATED);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        // Validation basique
+        if (mission.getPrefecture() == null || mission.getCommune() == null) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
+        if (mission.getDateEnvoi() == null) {
+            mission.setDateEnvoi(new Date());
+        }
+        if (mission.getStatut() == null || mission.getStatut().trim().isEmpty()) {
+            mission.setStatut("EN_COURS"); // Statut par défaut
+        }
+
+        Mission savedMission = missionService.create(mission);
+        return new ResponseEntity<>(savedMission, HttpStatus.CREATED);
     }
 
     // PUT update mission - créateur + GOUVERNEUR/MEMBRE_DSI
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@missionServiceImpl.findById(#id).isPresent() and @missionServiceImpl.findById(#id).get().getCreatedByUserId() == authentication.name)")
     public ResponseEntity<Mission> updateMission(@PathVariable Long id, @RequestBody Mission mission) {
-        try {
-            Optional<Mission> existingMission = missionService.findById(id);
-            if (existingMission.isPresent()) {
-                mission.setMissionId(id);
-                // Conserver les métadonnées originales
-                mission.setCreatedAt(existingMission.get().getCreatedAt());
-                // Conserver la date de completion si elle existe déjà
-                if (existingMission.get().getCompletedAt() != null) {
-                    mission.setCompletedAt(existingMission.get().getCompletedAt());
-                }
-
-                Mission updatedMission = missionService.update(mission);
-                return new ResponseEntity<>(updatedMission, HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        Optional<Mission> existingMission = missionService.findById(id);
+        if (existingMission.isPresent()) {
+            mission.setMissionId(id);
+            // Conserver les métadonnées originales
+            mission.setCreatedAt(existingMission.get().getCreatedAt());
+            // Conserver la date de completion si elle existe déjà
+            if (existingMission.get().getCompletedAt() != null) {
+                mission.setCompletedAt(existingMission.get().getCompletedAt());
             }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+
+            Mission updatedMission = missionService.update(mission);
+            return new ResponseEntity<>(updatedMission, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -101,16 +84,12 @@ public class MissionController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR')")
     public ResponseEntity<Void> deleteMission(@PathVariable Long id) {
-        try {
-            Optional<Mission> mission = missionService.findById(id);
-            if (mission.isPresent()) {
-                missionService.delete(id);
-                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        Optional<Mission> mission = missionService.findById(id);
+        if (mission.isPresent()) {
+            missionService.delete(id);
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -118,12 +97,8 @@ public class MissionController {
     @GetMapping("/statut/{statut}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Mission>> getMissionsByStatut(@PathVariable String statut) {
-        try {
-            List<Mission> missions = missionService.findByStatut(statut);
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findByStatut(statut);
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // GET missions by location
@@ -132,24 +107,16 @@ public class MissionController {
     public ResponseEntity<List<Mission>> getMissionsByLocation(
             @RequestParam String prefecture,
             @RequestParam String commune) {
-        try {
-            List<Mission> missions = missionService.findByLocation(prefecture, commune);
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findByLocation(prefecture, commune);
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // GET missions by creator user ID
     @GetMapping("/created-by/{userId}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or #userId == authentication.name")
     public ResponseEntity<List<Mission>> getMissionsByCreator(@PathVariable String userId) {
-        try {
-            List<Mission> missions = missionService.findByCreatedByUserId(userId);
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findByCreatedByUserId(userId);
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // GET missions by date range
@@ -158,94 +125,70 @@ public class MissionController {
     public ResponseEntity<List<Mission>> getMissionsByDateRange(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
-        try {
-            List<Mission> missions = missionService.findByDateRange(startDate, endDate);
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findByDateRange(startDate, endDate);
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // GET completed missions
     @GetMapping("/completed")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Mission>> getCompletedMissions() {
-        try {
-            List<Mission> missions = missionService.findCompletedMissions();
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findCompletedMissions();
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // GET active missions (non terminées)
     @GetMapping("/active")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Mission>> getActiveMissions() {
-        try {
-            List<Mission> missions = missionService.findActiveMissions();
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findActiveMissions();
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // GET missions by current user (créées par l'utilisateur connecté)
     @GetMapping("/my-missions")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Mission>> getMyMissions() {
-        try {
-            String currentUserId = org.springframework.security.core.context.SecurityContextHolder
-                    .getContext().getAuthentication().getName();
+        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getName();
 
-            List<Mission> missions = missionService.findByCreatedByUserId(currentUserId);
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findByCreatedByUserId(currentUserId);
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // GET missions assigned to current user
     @GetMapping("/assigned-to-me")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Mission>> getMissionsAssignedToMe() {
-        try {
-            String currentUserId = org.springframework.security.core.context.SecurityContextHolder
-                    .getContext().getAuthentication().getName();
+        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getName();
 
-            // Récupérer toutes les missions et filtrer celles assignées à l'utilisateur connecté
-            List<Mission> allMissions = missionService.findAll();
-            List<Mission> assignedMissions = allMissions.stream()
-                    .filter(mission -> mission.getAssignedUserIds() != null &&
-                            mission.getAssignedUserIds().contains(currentUserId))
-                    .toList();
+        // Récupérer toutes les missions et filtrer celles assignées à l'utilisateur connecté
+        List<Mission> allMissions = missionService.findAll();
+        List<Mission> assignedMissions = allMissions.stream()
+                .filter(mission -> mission.getAssignedUserIds() != null &&
+                        mission.getAssignedUserIds().contains(currentUserId))
+                .toList();
 
-            return new ResponseEntity<>(assignedMissions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(assignedMissions, HttpStatus.OK);
     }
 
     // PUT complete mission - créateur + GOUVERNEUR/MEMBRE_DSI
     @PutMapping("/{id}/complete")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@missionServiceImpl.findById(#id).isPresent() and @missionServiceImpl.findById(#id).get().getCreatedByUserId() == authentication.name)")
     public ResponseEntity<Mission> completeMission(@PathVariable Long id) {
-        try {
-            Optional<Mission> existingMission = missionService.findById(id);
-            if (existingMission.isPresent()) {
-                if (existingMission.get().isCompleted()) {
-                    return new ResponseEntity<>(HttpStatus.CONFLICT); // Déjà terminée
-                }
-
-                missionService.completeMission(id);
-                // Récupérer la mission mise à jour
-                Optional<Mission> updatedMission = missionService.findById(id);
-                return new ResponseEntity<>(updatedMission.get(), HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        Optional<Mission> existingMission = missionService.findById(id);
+        if (existingMission.isPresent()) {
+            if (existingMission.get().isCompleted()) {
+                return new ResponseEntity<>(HttpStatus.CONFLICT); // Déjà terminée
             }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+
+            missionService.completeMission(id);
+            // Récupérer la mission mise à jour
+            Optional<Mission> updatedMission = missionService.findById(id);
+            return new ResponseEntity<>(updatedMission.get(), HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -255,19 +198,15 @@ public class MissionController {
     public ResponseEntity<Mission> updateMissionReport(
             @PathVariable Long id,
             @RequestBody ReportUpdateRequest request) {
-        try {
-            Optional<Mission> existingMission = missionService.findById(id);
-            if (existingMission.isPresent()) {
-                Mission mission = existingMission.get();
-                mission.setRapportPDF(request.getRapportPDF());
+        Optional<Mission> existingMission = missionService.findById(id);
+        if (existingMission.isPresent()) {
+            Mission mission = existingMission.get();
+            mission.setRapportPDF(request.getRapportPDF());
 
-                Mission updatedMission = missionService.update(mission);
-                return new ResponseEntity<>(updatedMission, HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            Mission updatedMission = missionService.update(mission);
+            return new ResponseEntity<>(updatedMission, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -277,19 +216,15 @@ public class MissionController {
     public ResponseEntity<Mission> assignUsersToMission(
             @PathVariable Long id,
             @RequestBody UserAssignmentRequest request) {
-        try {
-            Optional<Mission> existingMission = missionService.findById(id);
-            if (existingMission.isPresent()) {
-                Mission mission = existingMission.get();
-                mission.setAssignedUserIds(request.getUserIds());
+        Optional<Mission> existingMission = missionService.findById(id);
+        if (existingMission.isPresent()) {
+            Mission mission = existingMission.get();
+            mission.setAssignedUserIds(request.getUserIds());
 
-                Mission updatedMission = missionService.update(mission);
-                return new ResponseEntity<>(updatedMission, HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            Mission updatedMission = missionService.update(mission);
+            return new ResponseEntity<>(updatedMission, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -297,24 +232,16 @@ public class MissionController {
     @GetMapping("/en-cours")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Mission>> getMissionsEnCours() {
-        try {
-            List<Mission> missions = missionService.findByStatut("EN_COURS");
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findByStatut("EN_COURS");
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // GET missions terminées
     @GetMapping("/terminees")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Mission>> getMissionsTerminees() {
-        try {
-            List<Mission> missions = missionService.findByStatut("TERMINEE");
-            return new ResponseEntity<>(missions, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Mission> missions = missionService.findByStatut("TERMINEE");
+        return new ResponseEntity<>(missions, HttpStatus.OK);
     }
 
     // Classes internes pour les requêtes

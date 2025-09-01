@@ -19,12 +19,10 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/changements")
-@CrossOrigin(origins = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"})
 public class ChangementController {
 
     @Autowired private ChangementService changementService;
     @Autowired private DouarRepository douarRepository;
-    @Autowired private FichierService fichierService; // pour recuperer les PDF associes
 
     // ---------- mapping manuel ----------
     private ChangementDTO toDto(Changement e) {
@@ -68,102 +66,72 @@ public class ChangementController {
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ChangementDTO>> getAllChangements() {
-        try {
-            var dtos = changementService.findAll().stream().map(this::toDto).collect(Collectors.toList());
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        var dtos = changementService.findAll().stream().map(this::toDto).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ChangementDTO> getChangementById(@PathVariable Long id) {
-        try {
-            return changementService.findById(id)
-                    .map(this::toDto)
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return changementService.findById(id)
+                .map(this::toDto)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ChangementDTO> createChangement(@RequestBody ChangementDTO dto) {
-        try {
-            if (dto.dateBefore == null) {
-                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-            }
-            var saved = changementService.create(fromDto(dto));
-            return new ResponseEntity<>(toDto(saved), HttpStatus.CREATED);
-        } catch (IllegalArgumentException notFound) {
+        if (dto.dateBefore == null) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
+        var saved = changementService.create(fromDto(dto));
+        return new ResponseEntity<>(toDto(saved), HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@changementServiceImpl.findById(#id).isPresent() and @changementServiceImpl.findById(#id).get().getDetectedByUserId() == authentication.name)")
     public ResponseEntity<ChangementDTO> updateChangement(@PathVariable Long id, @RequestBody ChangementDTO dto) {
-        try {
-            var existing = changementService.findById(id);
-            if (existing.isEmpty()) return ResponseEntity.notFound().build();
+        var existing = changementService.findById(id);
+        if (existing.isEmpty()) return ResponseEntity.notFound().build();
 
-            dto.changementId = id;
-            var entity = fromDto(dto);
-            // préserver createdAt si géré par l’entité
-            entity.setCreatedAt(existing.get().getCreatedAt());
+        dto.changementId = id;
+        var entity = fromDto(dto);
+        // préserver createdAt si géré par l’entité
+        entity.setCreatedAt(existing.get().getCreatedAt());
 
-            var saved = changementService.update(entity);
-            return ResponseEntity.ok(toDto(saved));
-        } catch (IllegalArgumentException notFound) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        var saved = changementService.update(entity);
+        return ResponseEntity.ok(toDto(saved));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI')")
     public ResponseEntity<Void> deleteChangement(@PathVariable Long id) {
-        try {
-            if (changementService.findById(id).isEmpty()) return ResponseEntity.notFound().build();
-            changementService.delete(id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        if (changementService.findById(id).isEmpty()) return ResponseEntity.notFound().build();
+        changementService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     // Filtres — mêmes signatures, mais retours en DTO
     @GetMapping("/type/{type}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ChangementDTO>> getChangementsByType(@PathVariable TypeExtension type) {
-        try {
-            var dtos = changementService.findByType(type).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = changementService.findByType(type).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/douar/{douarId}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ChangementDTO>> getChangementsByDouarId(@PathVariable Long douarId) {
-        try {
-            var dtos = changementService.findByDouarId(douarId).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = changementService.findByDouarId(douarId).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/detected-by/{userId}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or #userId == authentication.name")
     public ResponseEntity<List<ChangementDTO>> getChangementsByDetectedUser(@PathVariable String userId) {
-        try {
-            var dtos = changementService.findByDetectedByUserId(userId).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = changementService.findByDetectedByUserId(userId).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/date-range")
@@ -171,49 +139,39 @@ public class ChangementController {
     public ResponseEntity<List<ChangementDTO>> getChangementsByDateRange(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
-        try {
-            var dtos = changementService.findByDateRange(startDate, endDate).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = changementService.findByDateRange(startDate, endDate).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/surface-minimum")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ChangementDTO>> getChangementsBySurfaceMinimum(@RequestParam Double minSurface) {
-        try {
-            if (minSurface < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-            var dtos = changementService.findBySurfaceMinimum(minSurface).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        if (minSurface < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        var dtos = changementService.findBySurfaceMinimum(minSurface).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/my-changements")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ChangementDTO>> getMyChangements() {
-        try {
-            String currentUserId = org.springframework.security.core.context.SecurityContextHolder
-                    .getContext().getAuthentication().getName();
-            var dtos = changementService.findByDetectedByUserId(currentUserId).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getName();
+        var dtos = changementService.findByDetectedByUserId(currentUserId).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/horizontal")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ChangementDTO>> getHorizontalExtensions() {
-        try {
-            var dtos = changementService.findByType(TypeExtension.HORIZONTAL).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = changementService.findByType(TypeExtension.HORIZONTAL).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/vertical")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ChangementDTO>> getVerticalExtensions() {
-        try {
-            var dtos = changementService.findByType(TypeExtension.VERTICAL).stream().map(this::toDto).toList();
-            return ResponseEntity.ok(dtos);
-        } catch (Exception e) { return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); }
+        var dtos = changementService.findByType(TypeExtension.VERTICAL).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(dtos);
     }
 
 }

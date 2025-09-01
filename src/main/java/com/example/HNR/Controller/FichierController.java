@@ -14,7 +14,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/fichiers")
-@CrossOrigin(origins = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"})
 public class FichierController {
 
     @Autowired
@@ -24,27 +23,19 @@ public class FichierController {
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Fichier>> getAllFichiers() {
-        try {
-            List<Fichier> fichiers = fichierService.findAll();
-            return new ResponseEntity<>(fichiers, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Fichier> fichiers = fichierService.findAll();
+        return new ResponseEntity<>(fichiers, HttpStatus.OK);
     }
 
     // GET fichier by id
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<Fichier> getFichierById(@PathVariable Long id) {
-        try {
-            Optional<Fichier> fichier = fichierService.findById(id);
-            if (fichier.isPresent()) {
-                return new ResponseEntity<>(fichier.get(), HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        Optional<Fichier> fichier = fichierService.findById(id);
+        if (fichier.isPresent()) {
+            return new ResponseEntity<>(fichier.get(), HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -52,52 +43,44 @@ public class FichierController {
     @PostMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<Fichier> createFichier(@RequestBody Fichier fichier) {
-        try {
-            // Validation basique
-            if (fichier.getFileName() == null || fichier.getFileName().trim().isEmpty()) {
-                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-            }
-            if (fichier.getFilePath() == null || fichier.getUrl() == null) {
-                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-            }
-            if (fichier.getUploadedByUserId() == null || fichier.getUploadedByUserId().trim().isEmpty()) {
-                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-            }
-
-            // Définir la date d'upload si non fournie
-            if (fichier.getUploadedAt() == null) {
-                fichier.setUploadedAt(new Date());
-            }
-
-            // S'assurer que le fichier n'est pas marqué comme supprimé à la création
-            fichier.setDeletedAt(null);
-
-            Fichier savedFichier = fichierService.create(fichier);
-            return new ResponseEntity<>(savedFichier, HttpStatus.CREATED);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        // Validation basique
+        if (fichier.getFileName() == null || fichier.getFileName().trim().isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
+        if (fichier.getFilePath() == null || fichier.getUrl() == null) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+        if (fichier.getUploadedByUserId() == null || fichier.getUploadedByUserId().trim().isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+
+        // Définir la date d'upload si non fournie
+        if (fichier.getUploadedAt() == null) {
+            fichier.setUploadedAt(new Date());
+        }
+
+        // S'assurer que le fichier n'est pas marqué comme supprimé à la création
+        fichier.setDeletedAt(null);
+
+        Fichier savedFichier = fichierService.create(fichier);
+        return new ResponseEntity<>(savedFichier, HttpStatus.CREATED);
     }
 
     // PUT update fichier - uploader + GOUVERNEUR/MEMBRE_DSI
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@fichierServiceImpl.findById(#id).isPresent() and @fichierServiceImpl.findById(#id).get().getUploadedByUserId() == authentication.name)")
     public ResponseEntity<Fichier> updateFichier(@PathVariable Long id, @RequestBody Fichier fichier) {
-        try {
-            Optional<Fichier> existingFichier = fichierService.findById(id);
-            if (existingFichier.isPresent()) {
-                fichier.setFichierId(id);
-                // Conserver les métadonnées originales
-                fichier.setUploadedAt(existingFichier.get().getUploadedAt());
-                fichier.setDeletedAt(existingFichier.get().getDeletedAt());
+        Optional<Fichier> existingFichier = fichierService.findById(id);
+        if (existingFichier.isPresent()) {
+            fichier.setFichierId(id);
+            // Conserver les métadonnées originales
+            fichier.setUploadedAt(existingFichier.get().getUploadedAt());
+            fichier.setDeletedAt(existingFichier.get().getDeletedAt());
 
-                Fichier updatedFichier = fichierService.update(fichier);
-                return new ResponseEntity<>(updatedFichier, HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            Fichier updatedFichier = fichierService.update(fichier);
+            return new ResponseEntity<>(updatedFichier, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -105,16 +88,12 @@ public class FichierController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@fichierServiceImpl.findById(#id).isPresent() and @fichierServiceImpl.findById(#id).get().getUploadedByUserId() == authentication.name)")
     public ResponseEntity<Void> deleteFichier(@PathVariable Long id) {
-        try {
-            Optional<Fichier> fichier = fichierService.findById(id);
-            if (fichier.isPresent()) {
-                fichierService.delete(id); // Effectue un soft delete
-                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        Optional<Fichier> fichier = fichierService.findById(id);
+        if (fichier.isPresent()) {
+            fichierService.delete(id); // Effectue un soft delete
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -122,36 +101,24 @@ public class FichierController {
     @GetMapping("/content-type/{contentType}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Fichier>> getFichiersByContentType(@PathVariable String contentType) {
-        try {
-            List<Fichier> fichiers = fichierService.findByContentType(contentType);
-            return new ResponseEntity<>(fichiers, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Fichier> fichiers = fichierService.findByContentType(contentType);
+        return new ResponseEntity<>(fichiers, HttpStatus.OK);
     }
 
     // GET fichiers by uploader user ID
     @GetMapping("/uploaded-by/{userId}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or #userId == authentication.name")
     public ResponseEntity<List<Fichier>> getFichiersByUploader(@PathVariable String userId) {
-        try {
-            List<Fichier> fichiers = fichierService.findByUserId(userId);
-            return new ResponseEntity<>(fichiers, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Fichier> fichiers = fichierService.findByUserId(userId);
+        return new ResponseEntity<>(fichiers, HttpStatus.OK);
     }
 
     // GET fichiers by changement ID
     @GetMapping("/changement/{changementId}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Fichier>> getFichiersByChangementId(@PathVariable Long changementId) {
-        try {
-            List<Fichier> fichiers = fichierService.findByChangementId(changementId);
-            return new ResponseEntity<>(fichiers, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Fichier> fichiers = fichierService.findByChangementId(changementId);
+        return new ResponseEntity<>(fichiers, HttpStatus.OK);
     }
 
     // GET fichiers by entity
@@ -160,103 +127,75 @@ public class FichierController {
     public ResponseEntity<List<Fichier>> getFichiersByEntity(
             @PathVariable String entityType,
             @PathVariable Long entityId) {
-        try {
-            List<Fichier> fichiers = fichierService.findByEntity(entityType, entityId);
-            return new ResponseEntity<>(fichiers, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Fichier> fichiers = fichierService.findByEntity(entityType, entityId);
+        return new ResponseEntity<>(fichiers, HttpStatus.OK);
     }
 
     // GET images only
     @GetMapping("/images")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Fichier>> getImages() {
-        try {
-            List<Fichier> images = fichierService.findImages();
-            return new ResponseEntity<>(images, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Fichier> images = fichierService.findImages();
+        return new ResponseEntity<>(images, HttpStatus.OK);
     }
 
     // GET active fichiers (non supprimés)
     @GetMapping("/active")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Fichier>> getActiveFichiers() {
-        try {
-            List<Fichier> fichiers = fichierService.findActiveFichiers();
-            return new ResponseEntity<>(fichiers, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Fichier> fichiers = fichierService.findActiveFichiers();
+        return new ResponseEntity<>(fichiers, HttpStatus.OK);
     }
 
     // GET fichiers by current user (uploadés par l'utilisateur connecté)
     @GetMapping("/my-fichiers")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Fichier>> getMyFichiers() {
-        try {
-            String currentUserId = org.springframework.security.core.context.SecurityContextHolder
-                    .getContext().getAuthentication().getName();
+        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getName();
 
-            List<Fichier> fichiers = fichierService.findByUserId(currentUserId);
-            return new ResponseEntity<>(fichiers, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Fichier> fichiers = fichierService.findByUserId(currentUserId);
+        return new ResponseEntity<>(fichiers, HttpStatus.OK);
     }
 
     // GET PDFs only
     @GetMapping("/pdfs")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Fichier>> getPDFs() {
-        try {
-            List<Fichier> pdfs = fichierService.findByContentType("application/pdf");
-            return new ResponseEntity<>(pdfs, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<Fichier> pdfs = fichierService.findByContentType("application/pdf");
+        return new ResponseEntity<>(pdfs, HttpStatus.OK);
     }
 
     // GET recent fichiers (ordre décroissant par date d'upload)
     @GetMapping("/recent")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Fichier>> getRecentFichiers() {
-        try {
-            List<Fichier> fichiers = fichierService.findActiveFichiers();
-            // Trier par date d'upload décroissante
-            fichiers.sort((f1, f2) -> f2.getUploadedAt().compareTo(f1.getUploadedAt()));
+        List<Fichier> fichiers = fichierService.findActiveFichiers();
+        // Trier par date d'upload décroissante
+        fichiers.sort((f1, f2) -> f2.getUploadedAt().compareTo(f1.getUploadedAt()));
 
-            // Limiter aux 20 plus récents
-            List<Fichier> recentFichiers = fichiers.stream().limit(20).toList();
+        // Limiter aux 20 plus récents
+        List<Fichier> recentFichiers = fichiers.stream().limit(20).toList();
 
-            return new ResponseEntity<>(recentFichiers, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(recentFichiers, HttpStatus.OK);
     }
 
     // PUT restore deleted fichier - uploader + GOUVERNEUR/MEMBRE_DSI
     @PutMapping("/{id}/restore")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@fichierServiceImpl.findById(#id).isPresent() and @fichierServiceImpl.findById(#id).get().getUploadedByUserId() == authentication.name)")
     public ResponseEntity<Fichier> restoreFichier(@PathVariable Long id) {
-        try {
-            Optional<Fichier> existingFichier = fichierService.findById(id);
-            if (existingFichier.isPresent()) {
-                Fichier fichier = existingFichier.get();
-                if (!fichier.isDeleted()) {
-                    return new ResponseEntity<>(HttpStatus.CONFLICT); // Déjà actif
-                }
-
-                fichier.setDeletedAt(null); // Restaurer
-                Fichier restoredFichier = fichierService.update(fichier);
-                return new ResponseEntity<>(restoredFichier, HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        Optional<Fichier> existingFichier = fichierService.findById(id);
+        if (existingFichier.isPresent()) {
+            Fichier fichier = existingFichier.get();
+            if (!fichier.isDeleted()) {
+                return new ResponseEntity<>(HttpStatus.CONFLICT); // Déjà actif
             }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+
+            fichier.setDeletedAt(null); // Restaurer
+            Fichier restoredFichier = fichierService.update(fichier);
+            return new ResponseEntity<>(restoredFichier, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -266,28 +205,24 @@ public class FichierController {
     public ResponseEntity<Fichier> updateFichierMetadata(
             @PathVariable Long id,
             @RequestBody FileMetadataUpdateRequest request) {
-        try {
-            Optional<Fichier> existingFichier = fichierService.findById(id);
-            if (existingFichier.isPresent()) {
-                Fichier fichier = existingFichier.get();
+        Optional<Fichier> existingFichier = fichierService.findById(id);
+        if (existingFichier.isPresent()) {
+            Fichier fichier = existingFichier.get();
 
-                if (request.getEntityType() != null) {
-                    fichier.setEntityType(request.getEntityType());
-                }
-                if (request.getEntityId() != null) {
-                    fichier.setEntityId(request.getEntityId());
-                }
-                if (request.getFileName() != null) {
-                    fichier.setFileName(request.getFileName());
-                }
-
-                Fichier updatedFichier = fichierService.update(fichier);
-                return new ResponseEntity<>(updatedFichier, HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            if (request.getEntityType() != null) {
+                fichier.setEntityType(request.getEntityType());
             }
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            if (request.getEntityId() != null) {
+                fichier.setEntityId(request.getEntityId());
+            }
+            if (request.getFileName() != null) {
+                fichier.setFileName(request.getFileName());
+            }
+
+            Fichier updatedFichier = fichierService.update(fichier);
+            return new ResponseEntity<>(updatedFichier, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
 
@@ -295,16 +230,12 @@ public class FichierController {
     @GetMapping("/extension/{extension}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<Fichier>> getFichiersByExtension(@PathVariable String extension) {
-        try {
-            List<Fichier> allFichiers = fichierService.findActiveFichiers();
-            List<Fichier> filteredFichiers = allFichiers.stream()
-                    .filter(f -> f.getFileName().toLowerCase().endsWith("." + extension.toLowerCase()))
-                    .toList();
+        List<Fichier> allFichiers = fichierService.findActiveFichiers();
+        List<Fichier> filteredFichiers = allFichiers.stream()
+                .filter(f -> f.getFileName().toLowerCase().endsWith("." + extension.toLowerCase()))
+                .toList();
 
-            return new ResponseEntity<>(filteredFichiers, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(filteredFichiers, HttpStatus.OK);
     }
 
     // Classe interne pour la mise à jour des métadonnées
