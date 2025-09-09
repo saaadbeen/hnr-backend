@@ -1,7 +1,10 @@
 package com.example.HNR.Config;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -15,30 +18,51 @@ import java.util.function.Function;
 @Component
 public class JwtTokenUtil {
 
-    @Value("${app.jwtSecret}")
+    private static final Logger logger = LoggerFactory.getLogger(JwtTokenUtil.class);
+
+    // ⚠️ fournis un vrai secret via properties/env; défaut seulement pour dev
+    @Value("${jwt.secret:myDefaultSecretKeyForJwtTokenGenerationThatShouldBeAtLeast64Characters_LongEnough_ForHS512!}")
     private String secret;
 
-    @Value("${app.jwtExpirationInMs}")
-    private long jwtExpirationInMs;
+    // secondes (3600 = 1h). Ne mets PAS des millisecondes ici.
+    @Value("${jwt.expiration:3600}")
+    private long jwtExpirationInSeconds;
 
     private SecretKey getSigningKey() {
-        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes;
+
+        // Support "base64:<valeur>"
+        if (secret != null && secret.startsWith("base64:")) {
+            keyBytes = Decoders.BASE64.decode(secret.substring("base64:".length()));
+        } else {
+            keyBytes = (secret != null ? secret : "").getBytes(StandardCharsets.UTF_8);
+        }
+
+        // HS512 => ≥ 64 octets (512 bits)
+        if (keyBytes.length < 64) {
+            String msg = "JWT secret too short for HS512: need >= 64 bytes, got " + keyBytes.length +
+                    ". Provide a stronger key (e.g. base64:...)";
+            logger.error(msg);
+            throw new IllegalStateException(msg);
+        }
+
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // Récupérer username du token JWT
     public String getUsernameFromToken(String token) {
         return getClaimFromToken(token, Claims::getSubject);
     }
 
-    // Alias pour AuthController
-    public String getUserIdFromToken(String token) {
+    public String getUserIdFromToken(String token) { // alias
         return getUsernameFromToken(token);
     }
 
-    // Récupérer date d'expiration du token JWT
     public Date getExpirationDateFromToken(String token) {
         return getClaimFromToken(token, Claims::getExpiration);
+    }
+
+    public String getRoleFromToken(String token) {
+        return getClaimFromToken(token, claims -> (String) claims.get("role"));
     }
 
     public <T> T getClaimFromToken(String token, Function<Claims, T> claimsResolver) {
@@ -54,56 +78,50 @@ public class JwtTokenUtil {
                 .getBody();
     }
 
-    // Vérifier si le token a expiré
     private Boolean isTokenExpired(String token) {
         final Date expiration = getExpirationDateFromToken(token);
         return expiration.before(new Date());
     }
 
-    // Générer token pour userId (utilisé dans AuthController)
-    public String generateToken(String userId) {
-        Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, userId);
+    public String generateToken(String username) {
+        return createToken(new HashMap<>(), username);
     }
 
-    // Générer token pour userId avec rôle
-    public String generateToken(String userId, String role) {
+    public String generateToken(String username, String role) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("role", role);
-        return createToken(claims, userId);
+        if (role != null && !role.isBlank()) claims.put("role", role);
+        return createToken(claims, username);
     }
 
     private String createToken(Map<String, Object> claims, String subject) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + (jwtExpirationInSeconds * 1000L));
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationInMs))
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
 
-    // Valider token (utilisé dans JwtRequestFilter)
     public Boolean validateToken(String token, String username) {
         final String tokenUsername = getUsernameFromToken(token);
-        return (tokenUsername.equals(username) && !isTokenExpired(token));
+        return (username.equals(tokenUsername) && !isTokenExpired(token));
     }
 
-    // Valider token sans username (utilisé dans AuthController)
     public boolean validateToken(String token) {
-        try {
-            Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token);
-            return !isTokenExpired(token);
-        } catch (JwtException | IllegalArgumentException e) {
-            return false;
-        }
+        Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
+        return !isTokenExpired(token);
     }
 
-    // Récupérer le rôle du token
-    public String getRoleFromToken(String token) {
-        return getClaimFromToken(token, claims -> (String) claims.get("role"));
+    public long getExpirationTimeInSeconds(String token) {
+        Date expiration = getExpirationDateFromToken(token);
+        long delta = (expiration.getTime() - System.currentTimeMillis()) / 1000L;
+        return Math.max(0, delta);
+    }
+
+    public boolean isTokenValidAndNotExpired(String token) {
+        return validateToken(token) && !isTokenExpired(token);
     }
 }

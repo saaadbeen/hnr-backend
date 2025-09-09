@@ -1,90 +1,109 @@
 package com.example.HNR.Service;
 
+import com.example.HNR.DTO.MissionDTO;
+import com.example.HNR.DTO.Request.MissionCreateRequest;
+import com.example.HNR.DTO.Request.MissionUpdateRequest;
 import com.example.HNR.Model.SqlServer.Mission;
+import com.example.HNR.Model.enums.Statut;
 import com.example.HNR.Repository.SqlServer.MissionRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import java.util.Date;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class MissionServiceImpl implements MissionService {
 
-    @Autowired
-    private MissionRepository missionRepository;
+    private final MissionRepository missionRepository;
 
     @Override
-    public Mission create(Mission mission) {
-        return missionRepository.save(mission);
+    public List<Mission> findAll() {
+        return missionRepository.findAll();
     }
 
     @Override
-    public Optional<Mission> findById(Long id) {
-        return missionRepository.findById(id);
+    public Optional<Mission> findByMissionId(Long missionId) {
+        return missionRepository.findById(missionId);
     }
 
     @Override
-    public Page<Mission> findAll(Pageable pageable) {
-        return missionRepository.findAll(pageable);
+    public List<MissionDTO> findByAssignedUser(String userId) {
+        return missionRepository.findByAssignedUserId(userId)
+                .stream().map(this::toDTO).toList();
     }
 
     @Override
-    public Mission update(Mission mission) {
-        return missionRepository.save(mission);
+    @Transactional
+    public MissionDTO create(MissionCreateRequest req, String createdByUserId) {
+        Objects.requireNonNull(req, "MissionCreateRequest null");
+
+        Mission m = new Mission();
+        m.setTitre(req.getTitre());
+        m.setDescription(req.getDescription());
+        m.setPrefecture(req.getPrefecture());
+        m.setCommune(req.getCommune());
+        m.setDateEnvoi(req.getDateEnvoi() != null ? req.getDateEnvoi() : OffsetDateTime.now());
+        m.setStatut(Statut.EN_COURS);
+        m.setAssignedUserId(req.getAssignedUserId());
+        m.setCreatedByUserId(createdByUserId);
+        m.setChangementId(req.getChangementId());
+        m.setGeometryType(req.getGeometryType() != null ? req.getGeometryType() : "POLYGON");
+        m.setPolygonWKT(req.getPolygonWKT());
+
+        Mission saved = missionRepository.save(m);
+        return toDTO(saved);
     }
 
     @Override
-    public void delete(Long id) {
-        missionRepository.deleteById(id);
+    @Transactional
+    public MissionDTO update(Long missionId, MissionUpdateRequest req) {
+        Mission m = missionRepository.findById(missionId)
+                .orElseThrow(() -> new IllegalArgumentException("Mission introuvable: " + missionId));
+
+        if (req.getTitre() != null) m.setTitre(req.getTitre());
+        if (req.getDescription() != null) m.setDescription(req.getDescription());
+        if (req.getPrefecture() != null) m.setPrefecture(req.getPrefecture());
+        if (req.getCommune() != null) m.setCommune(req.getCommune());
+        if (req.getDateEnvoi() != null) m.setDateEnvoi(req.getDateEnvoi());
+        if (req.getAssignedUserId() != null) m.setAssignedUserId(req.getAssignedUserId());
+        if (req.getChangementId() != null) m.setChangementId(req.getChangementId());
+        if (req.getGeometryType() != null) m.setGeometryType(req.getGeometryType());
+        if (req.getPolygonWKT() != null) m.setPolygonWKT(req.getPolygonWKT());
+        if (req.getRapportPdf() != null) m.setRapportPdf(req.getRapportPdf());
+        if (req.getStatut() != null) m.setStatut(Statut.valueOf(req.getStatut()));
+
+        Mission saved = missionRepository.save(m);
+        return toDTO(saved);
     }
 
     @Override
-    public List<Mission> findByStatut(String statut) {
-        return missionRepository.findByStatut(statut);
+    @Transactional
+    public void delete(Long missionId) {
+        missionRepository.deleteById(missionId);
     }
 
-    @Override
-    public List<Mission> findByLocation(String prefecture, String commune) {
-        if (prefecture != null && commune != null) {
-            return missionRepository.findByPrefectureAndCommune(prefecture, commune);
-        } else if (prefecture != null) {
-            return missionRepository.findByPrefecture(prefecture);
-        } else if (commune != null) {
-            return missionRepository.findByCommune(commune);
-        } else {
-            return missionRepository.findAll();
-        }
-    }
-
-    @Override
-    public List<Mission> findByCreatedByUserId(String userId) {
-        return missionRepository.findByCreatedByUserId(userId);
-    }
-
-    @Override
-    public List<Mission> findByDateRange(Date startDate, Date endDate) {
-        return missionRepository.findByDateEnvoiBetween(startDate, endDate);
-    }
-
-    @Override
-    public List<Mission> findCompletedMissions() {
-        return missionRepository.findCompletedMissions();
-    }
-
-    @Override
-    public List<Mission> findActiveMissions() {
-        return missionRepository.findActiveMissions();
-    }
-
-    @Override
-    public void completeMission(Long id) {
-        Optional<Mission> mission = missionRepository.findById(id);
-        if (mission.isPresent()) {
-            mission.get().complete();
-            missionRepository.save(mission.get());
-        }
+    private MissionDTO toDTO(Mission m) {
+        MissionDTO d = new MissionDTO();
+        d.setMissionId(m.getMissionId());
+        d.setTitre(m.getTitre());
+        d.setDescription(m.getDescription());
+        d.setPrefecture(m.getPrefecture());
+        d.setCommune(m.getCommune());
+        d.setDateEnvoi(m.getDateEnvoi());
+        d.setStatut(m.getStatut());
+        d.setAssignedUserId(m.getAssignedUserId());
+        d.setCreatedByUserId(m.getCreatedByUserId());
+        d.setChangementId(m.getChangementId());
+        d.setGeometryType(m.getGeometryType());
+        d.setPolygonWKT(m.getPolygonWKT());
+        d.setRapportPdf(m.getRapportPdf());
+        d.setCreatedAt(m.getCreatedAt());
+        d.setUpdatedAt(m.getUpdatedAt());
+        return d;
     }
 }

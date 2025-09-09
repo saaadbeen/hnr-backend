@@ -4,70 +4,106 @@ import com.example.HNR.Model.enums.TypeExtension;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.io.WKTReader;
 
 import java.util.Date;
-import java.util.List;
 
-/**
- * Entité Changement stockée dans SQL Server
- * Historique des extensions et modifications
- */
-@Entity
-@Table(name = "changements")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Entity
+@Table(name = "changements")
 public class Changement {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "changement_id")
     private Long changementId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "type", nullable = false, length = 50)
     private TypeExtension type;
 
-    @Column(name = "date_before", nullable = false)
-    @Temporal(TemporalType.DATE)
-    private Date dateBefore;
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "date", nullable = false)
+    private Date date;
 
-    @Column(name = "date_after")
-    @Temporal(TemporalType.DATE)
-    private Date dateAfter;
-
-    @Column(nullable = false)
-    private Double surface;
-
-    @Column(name = "photo_before", length = 500)
-    private String photoBefore; // URL de la photo avant
-
-    @Column(name = "photo_after", length = 500)
-    private String photoAfter; // URL de la photo après
-
-    // Relations
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "douar_id", nullable = false)
+    @JoinColumn(name = "douar_id")
     private Douar douar;
 
-    @OneToMany(mappedBy = "changement", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Fichier> fichiers;
-
-    // Référence vers l'utilisateur qui a détecté le changement (stocké dans MongoDB)
     @Column(name = "detected_by_user_id", length = 100)
     private String detectedByUserId;
 
-    // Métadonnées
+    @Column(name = "titre", length = 150)
+    private String titre;
+
+    @Column(name = "description", length = 1000)
+    private String description;
+
+    @Column(name = "prefecture", length = 150)
+    private String prefecture;
+
+    @Column(name = "commune", length = 150)
+    private String commune;
+
+    @Column(name = "pdf_url")
+    private String pdfUrl;
+
+    // 🗺️ Position
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "point_wkt")
+    private String pointWkt;
+
+    @Column(name = "polygon_wkt")
+    private String polygonWkt;
+
     @CreationTimestamp
+    @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", nullable = false, updatable = false)
     private Date createdAt;
 
     @UpdateTimestamp
+    @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "updated_at")
     private Date updatedAt;
+    @PrePersist
+    public void prePersist() {
+        Date now = new Date();
+        if (createdAt == null) createdAt = now;
+        if (date == null) date = now;
 
+        // Si on a lng/lat mais pas de WKT point → le générer
+        if ((pointWkt == null || pointWkt.isBlank()) && longitude != null && latitude != null) {
+            pointWkt = "POINT(" + longitude + " " + latitude + ")";
+        }
 
+        // Si on a un polygone mais pas de centroïde → tenter de déduire lng/lat (centroïde)
+        if ((longitude == null || latitude == null) && polygonWkt != null && !polygonWkt.isBlank()) {
+            try {
+                Geometry g = new WKTReader().read(polygonWkt);
+                Coordinate c = g.getCentroid().getCoordinate();
+                if (c != null) { longitude = c.x; latitude = c.y; }
+            } catch (Exception ignored) {}
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = new Date();
+        // garder la cohérence du point si lng/lat ont changé
+        if (longitude != null && latitude != null) {
+            pointWkt = "POINT(" + longitude + " " + latitude + ")";
+        }
+    }
 }

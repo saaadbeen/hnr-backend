@@ -35,7 +35,6 @@ public class User {
 
     private Date createdAt;
 
-    // Constructeur avec paramètres (garde pour compatibilité)
     public User(String userid, String fullName, String email, Role role, String prefecture, String commune) {
         this.userid = userid;
         this.fullName = fullName;

@@ -12,68 +12,55 @@ import com.example.HNR.Repository.SqlServer.ChangementRepository;
 import com.example.HNR.Repository.Mongodb.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@org.springframework.context.annotation.Profile("!dev")
 public class DashboardServiceImpl implements DashboardService {
 
-    @Autowired
-    private DouarRepository douarRepository;
-
-    @Autowired
-    private ActionRepository actionRepository;
-
-    @Autowired
-    private ChangementRepository changementRepository;
-
-    @Autowired
-    private MissionRepository missionRepository;
-
-    @Autowired
-    private PVRepository pvRepository;
-
-    @Autowired
-    private UserRepository userRepository;
+    @Autowired private DouarRepository douarRepository;
+    @Autowired private ActionRepository actionRepository;
+    @Autowired private ChangementRepository changementRepository;
+    @Autowired private MissionRepository missionRepository;
+    @Autowired private PVRepository pvRepository;
+    @Autowired private UserRepository userRepository;
 
     @Override
     public DashboardStatsDTO getDashboardStats() {
         return DashboardStatsDTO.builder()
-                // Statistiques des douars
+                // Douars
                 .totalDouars(douarRepository.count())
                 .douarsEradiques(douarRepository.countByStatut(StatutDouar.ERADIQUE))
                 .douarsNonEradiques(douarRepository.countByStatut(StatutDouar.NON_ERADIQUE))
                 .pourcentageEradication(calculateEradicationPercentage())
 
-                // Statistiques des actions
+                // Actions
                 .totalActions(actionRepository.count())
                 .totalDemolitions(actionRepository.countByType(TypeAction.DEMOLITION))
                 .totalSignalements(actionRepository.countByType(TypeAction.SIGNALEMENT))
                 .totalNonDemolitions(actionRepository.countByType(TypeAction.NON_DEMOLITION))
 
-                // Statistiques des changements
+                // Changements
                 .totalChangements(changementRepository.count())
-                .extensionsHorizontales(changementRepository.countByType(TypeExtension.HORIZONTAL))
-                .extensionsVerticales(changementRepository.countByType(TypeExtension.VERTICAL))
-                .surfaceTotaleExtensions(calculateTotalSurfaceExtensions())
 
-                // Statistiques des missions
+                // Missions
                 .totalMissions(missionRepository.count())
                 .missionsTerminees(missionRepository.countByStatut("TERMINEE"))
                 .missionsEnCours(missionRepository.count() - missionRepository.countByStatut("TERMINEE"))
 
-                // Statistiques des PV
+                // PVs
                 .totalPVs(pvRepository.count())
-                .pvsValides(pvRepository.countByValide(true))
-                .pvsEnAttente(pvRepository.countByValide(false))
 
-                // Statistiques des utilisateurs
+
+                // Utilisateurs
                 .totalUtilisateurs(userRepository.count())
                 .agentsAutorite(userRepository.countByRole(com.example.HNR.Model.enums.Role.AGENT_AUTORITE))
                 .membresDSI(userRepository.countByRole(com.example.HNR.Model.enums.Role.MEMBRE_DSI))
                 .gouverneurs(userRepository.countByRole(com.example.HNR.Model.enums.Role.GOUVERNEUR))
 
-                // Données pour graphiques
+                // Graphs
                 .actionsByType(getActionsByType())
                 .changementsByType(getChangementsByType())
                 .douarsByStatut(getDouarsByStatut())
@@ -83,74 +70,67 @@ public class DashboardServiceImpl implements DashboardService {
                 .actionsByPrefecture(getActionsByPrefecture())
                 .douarsByPrefecture(getDouarsByPrefecture())
 
-                // Top données
                 .build();
     }
 
     @Override
     public DashboardStatsDTO getDashboardStatsByPrefecture(String prefecture) {
-        // Implémentation similaire mais filtrée par préfecture
-        return getDashboardStats(); // Simplifiée pour l'exemple
+        // à affiner si besoin (filtrage par préfecture)
+        return getDashboardStats();
     }
 
     @Override
     public DashboardStatsDTO getDashboardStatsByDateRange(Date startDate, Date endDate) {
-        // Implémentation avec filtrage par dates
-        return getDashboardStats(); // Simplifiée pour l'exemple
+        // à affiner si besoin (filtrage par dates)
+        return getDashboardStats();
     }
 
     @Override
     public List<PrefectureStatsDTO> getPrefectureStats() {
-        // Récupérer toutes les préfectures distinctes
         List<String> prefectures = douarRepository.findDistinctPrefectures();
 
         return prefectures.stream().map(prefecture -> {
-            long totalDouars = douarRepository.countByPrefecture(prefecture);
-            long douarsEradiques = douarRepository.countByPrefectureAndStatut(prefecture, StatutDouar.ERADIQUE);
-            long totalActions = actionRepository.countByPrefecture(prefecture);
-            long totalChangements = changementRepository.countByDouarPrefecture(prefecture);
+            long totalDouars       = douarRepository.countByPrefecture(prefecture);
+            long douarsEradiques   = douarRepository.countByPrefectureAndStatut(prefecture, StatutDouar.ERADIQUE);
+            long totalActions      = actionRepository.countByPrefecture(prefecture);
+            long totalChangements  = changementRepository.countByPrefecture(prefecture); // ✅ défini ici
 
             return new PrefectureStatsDTO(
                     prefecture,
                     totalDouars,
                     douarsEradiques,
                     totalActions,
-                    totalChangements,
+                    totalChangements, // ✅ variable existe
                     totalDouars > 0 ? (double) douarsEradiques / totalDouars * 100 : 0
             );
         }).collect(Collectors.toList());
     }
 
-    // Méthodes utilitaires privées
     private double calculateEradicationPercentage() {
         long total = douarRepository.count();
         long eradiques = douarRepository.countByStatut(StatutDouar.ERADIQUE);
         return total > 0 ? (double) eradiques / total * 100 : 0;
     }
 
-    private double calculateTotalSurfaceExtensions() {
-        return changementRepository.sumSurface().orElse(0.0);
-    }
-
     private Map<String, Long> getActionsByType() {
         Map<String, Long> result = new HashMap<>();
-        result.put("DEMOLITION", actionRepository.countByType(TypeAction.DEMOLITION));
-        result.put("SIGNALEMENT", actionRepository.countByType(TypeAction.SIGNALEMENT));
+        result.put("DEMOLITION",   actionRepository.countByType(TypeAction.DEMOLITION));
+        result.put("SIGNALEMENT",  actionRepository.countByType(TypeAction.SIGNALEMENT));
         result.put("NON_DEMOLITION", actionRepository.countByType(TypeAction.NON_DEMOLITION));
         return result;
     }
 
     private Map<String, Long> getChangementsByType() {
         Map<String, Long> result = new HashMap<>();
-        result.put("HORIZONTAL", changementRepository.countByType(TypeExtension.HORIZONTAL));
-        result.put("VERTICAL", changementRepository.countByType(TypeExtension.VERTICAL));
+        result.put("HORIZONTAL", changementRepository.countByType(TypeExtension.HORIZONTAL)); // ✅ méthode ajoutée
+        result.put("VERTICAL",   changementRepository.countByType(TypeExtension.VERTICAL));   // ✅ méthode ajoutée
         return result;
     }
 
     private Map<String, Long> getDouarsByStatut() {
         Map<String, Long> result = new HashMap<>();
-        result.put("ERADIQUE", douarRepository.countByStatut(StatutDouar.ERADIQUE));
-        result.put("NON_ERADIQUE", douarRepository.countByStatut(StatutDouar.NON_ERADIQUE));
+        result.put("ERADIQUE",      douarRepository.countByStatut(StatutDouar.ERADIQUE));
+        result.put("NON_ERADIQUE",  douarRepository.countByStatut(StatutDouar.NON_ERADIQUE));
         return result;
     }
 
@@ -161,22 +141,15 @@ public class DashboardServiceImpl implements DashboardService {
         return result;
     }
 
-    private Map<String, Long> getActionsByMonth() {
-        // Implémentation pour les 12 derniers mois
-        return new HashMap<>(); // Simplifiée
-    }
-
-    private Map<String, Long> getChangementsByMonth() {
-        // Implémentation pour les 12 derniers mois
-        return new HashMap<>(); // Simplifiée
-    }
+    private Map<String, Long> getActionsByMonth() { return new HashMap<>(); }
+    private Map<String, Long> getChangementsByMonth() { return new HashMap<>(); }
 
     private Map<String, Long> getActionsByPrefecture() {
         return actionRepository.countByPrefectureGrouped()
                 .stream()
                 .collect(Collectors.toMap(
-                        result -> (String) result[0],
-                        result -> (Long) result[1]
+                        r -> (String) r[0],
+                        r -> (Long) r[1]
                 ));
     }
 
@@ -184,8 +157,8 @@ public class DashboardServiceImpl implements DashboardService {
         return douarRepository.countByPrefectureGrouped()
                 .stream()
                 .collect(Collectors.toMap(
-                        result -> (String) result[0],
-                        result -> (Long) result[1]
+                        r -> (String) r[0],
+                        r -> (Long) r[1]
                 ));
     }
 }

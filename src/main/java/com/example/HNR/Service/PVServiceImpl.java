@@ -1,25 +1,19 @@
 package com.example.HNR.Service;
 
+import com.example.HNR.Model.SqlServer.Action;
 import com.example.HNR.Model.SqlServer.PV;
 import com.example.HNR.Repository.SqlServer.PVRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+
 import java.util.Date;
-import java.util.List;
 import java.util.Optional;
 
-@Service("pvServiceImpl")
+@Service
 public class PVServiceImpl implements PVService {
 
-    @Autowired
-    private PVRepository pvRepository;
-
-    @Override
-    public PV create(PV pv) {
-        return pvRepository.save(pv);
-    }
+    @Autowired private PVRepository pvRepository;
+    @Autowired private ActionService actionService;
 
     @Override
     public Optional<PV> findById(Long id) {
@@ -27,12 +21,22 @@ public class PVServiceImpl implements PVService {
     }
 
     @Override
-    public Page<PV> findAll(Pageable pageable) {
-        return pvRepository.findAll(pageable);
+    public Optional<PV> findByActionId(Long actionId) {
+        return pvRepository.findByAction_ActionId(actionId);
+    }
+
+    @Override
+    public PV create(PV pv) {
+        if (pv.getDateRedaction() == null) pv.setDateRedaction(new Date());
+        if (pv.getContenu() == null) pv.setContenu("{}");
+        pv.setCreatedAt(new Date());
+        pv.setUpdatedAt(new Date());
+        return pvRepository.save(pv);
     }
 
     @Override
     public PV update(PV pv) {
+        pv.setUpdatedAt(new Date());
         return pvRepository.save(pv);
     }
 
@@ -41,36 +45,31 @@ public class PVServiceImpl implements PVService {
         pvRepository.deleteById(id);
     }
 
-
-
     @Override
-    public List<PV> findByRedacteurUserId(String userId) {
-        return pvRepository.findByRedacteurUserId(userId);
-    }
+    public PV createForAction(Long actionId, String contenuJSON, String redacteurUserId) {
+        // 1 PV par action : si déjà existant, on le renvoie
+        Optional<PV> existing = pvRepository.findByAction_ActionId(actionId);
+        if (existing.isPresent()) return existing.get();
 
+        Action action = actionService.findById(actionId)
+                .orElseThrow(() -> new IllegalArgumentException("Action introuvable: " + actionId));
 
+        PV pv = new PV();
+        pv.setAction(action);
+        pv.setContenu(contenuJSON != null ? contenuJSON : "{}");
+        pv.setDateRedaction(new Date());
+        pv.setRedacteurUserId(redacteurUserId);
+        pv.setCreatedAt(new Date());
+        pv.setUpdatedAt(new Date());
 
-    @Override
-    public Optional<PV> findByActionId(Long actionId) {
-        return pvRepository.findByActionActionId(actionId);
-    }
+        PV saved = pvRepository.save(pv);
 
-    @Override
-    public List<PV> findByDateRange(Date startDate, Date endDate) {
-        return pvRepository.findByDateRedactionBetween(startDate, endDate);
-    }
+        // Si ton entité Action a un champ pv, on l’actualise
+        try {
+            action.setPv(saved);
+            actionService.update(action);
+        } catch (Exception ignore) {}
 
-    @Override
-    public List<PV> findPVsWithPDF() {
-        return pvRepository.findPVsWithPDF();
-    }
-
-    @Override
-    public void validerPV(Long id, String validateurUserId) {
-        Optional<PV> pv = pvRepository.findById(id);
-        if (pv.isPresent()) {
-            pv.get().valider(validateurUserId);
-            pvRepository.save(pv.get());
-        }
+        return saved;
     }
 }

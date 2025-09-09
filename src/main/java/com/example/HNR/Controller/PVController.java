@@ -1,191 +1,139 @@
 package com.example.HNR.Controller;
 
+import com.example.HNR.DTO.ActionLightDTO;
+import com.example.HNR.DTO.PvDTO;
+import com.example.HNR.Model.SqlServer.Action;
 import com.example.HNR.Model.SqlServer.PV;
-import com.example.HNR.Service.PVService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
+import com.example.HNR.Repository.SqlServer.PVRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Date;
+import java.util.Map;
+import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-
+/**
+ * Contrôleur PV : renvoie des DTO pour éviter toute fuite d’entités (lazy)
+ */
 @RestController
 @RequestMapping("/api/pvs")
+@RequiredArgsConstructor
 public class PVController {
 
-    @Autowired
-    private PVService pvService;
-
-    // GET all PVs - accessible à tous les rôles authentifiés
-    @GetMapping
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<Page<PV>> getAllPVs(@RequestParam(defaultValue = "0") int page,
-                                              @RequestParam(defaultValue = "10") int size) {
-        Page<PV> pvs = pvService.findAll(PageRequest.of(page, size));
-        return new ResponseEntity<>(pvs, HttpStatus.OK);
-    }
-
-    // GET PV by id
-    @GetMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<PV> getPVById(@PathVariable Long id) {
-        Optional<PV> pv = pvService.findById(id);
-        if (pv.isPresent()) {
-            return new ResponseEntity<>(pv.get(), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    // POST create PV - accessible à tous les rôles authentifiés
-    @PostMapping
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<PV> createPV(@RequestBody PV pv) {
-        // Validation basique
-        if (pv.getContenu() == null || pv.getContenu().trim().isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-        if (pv.getRedacteurUserId() == null || pv.getRedacteurUserId().trim().isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-
-        // Définir la date de rédaction si non fournie
-        if (pv.getDateRedaction() == null) {
-            pv.setDateRedaction(new Date());
-        }
-
-        PV savedPV = pvService.create(pv);
-        return new ResponseEntity<>(savedPV, HttpStatus.CREATED);
-    }
-
-    // PUT update PV - rédacteur + GOUVERNEUR/MEMBRE_DSI
+    private final PVRepository pvRepository;
+    private final ObjectMapper objectMapper;
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@pvServiceImpl.findById(#id).isPresent() and @pvServiceImpl.findById(#id).get().getRedacteurUserId() == authentication.name)")
-    public ResponseEntity<PV> updatePV(@PathVariable Long id, @RequestBody PV pv) {
-        Optional<PV> existingPV = pvService.findById(id);
-        if (existingPV.isPresent()) {
-            pv.setPvId(id);
-            // Conserver les métadonnées originales
-            pv.setCreatedAt(existingPV.get().getCreatedAt());
+    public ResponseEntity<PvDTO> update(@PathVariable Long id, @RequestBody PvDTO body) {
+        Optional<PV> opt = pvRepository.findById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
-            PV updatedPV = pvService.update(pv);
-            return new ResponseEntity<>(updatedPV, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        PV pv = opt.get();
+        // sérialise le contenu reçu (Map) → String
+        try {
+            String json = body.getContenu() != null ? objectMapper.writeValueAsString(body.getContenu()) : "{}";
+            pv.setContenu(json);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+        pv.setUpdatedAt(new Date());
+        // (optionnel) statut/valide etc.
+        pvRepository.save(pv);
+        return ResponseEntity.ok(toDto(pv));
+    }
+    @GetMapping("/{id}")
+    public ResponseEntity<PvDTO> getById(@PathVariable Long id) {
+        Optional<PV> opt = pvRepository.findById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(toDto(opt.get()));
+    }
+
+    @GetMapping("/by-action/{actionId}")
+    public ResponseEntity<PvDTO> getByAction(@PathVariable Long actionId) {
+        Optional<PV> opt = pvRepository.findByAction_ActionId(actionId);
+        if (opt.isEmpty()) {
+            // 404 volontaire : ton front s’attend à null lorsque pas de PV
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        return ResponseEntity.ok(toDto(opt.get()));
+    }
+
+    /* =======================
+       Mapping Entity -> DTO
+       ======================= */
+    private PvDTO toDto(PV pv) {
+        PvDTO dto = new PvDTO();
+
+        Long id = safePvId(pv);
+        dto.setId(id);
+        dto.setPvId(id);
+
+        // Contenu JSON -> Map
+        dto.setContenu(readJson(pv.getContenu()));
+
+        // Statut lisible pour le front
+        boolean valide = safeBoolean(pv.getValide());
+        dto.setStatut(valide ? "PUBLIE" : "BROUILLON");
+
+        // Dates si présentes dans l’entité
+        dto.setCreatedAt(safeDate(pv.getCreatedAt()));
+        dto.setUpdatedAt(safeDate(pv.getUpdatedAt()));
+
+        // Action light
+        Action a = pv.getAction();
+        if (a != null) {
+            ActionLightDTO al = new ActionLightDTO();
+            al.setActionId(a.getActionId());
+            al.setType(a.getType() != null ? a.getType().name() : null);
+
+            Date d = a.getDateAction();
+            al.setDate(d);
+            al.setDateAction(d);
+
+            al.setPrefecture(a.getPrefecture());
+            al.setCommune(a.getCommune());
+
+            // On ne renvoie que les IDs pour éviter tout lazy
+            al.setDouarId(a.getDouar() != null ? a.getDouar().getDouarId() : null);
+            al.setMissionId(a.getMission() != null ? a.getMission().getMissionId() : null);
+
+            al.setPhotoAvantUrl(a.getPhotoAvantUrl());
+            al.setPhotoApresUrl(a.getPhotoApresUrl());
+            al.setUserId(a.getUserId());
+
+            dto.setAction(al);
+            dto.setActionId(a.getActionId());
+            // Type de PV = type de l’action (utile pour PVEditor)
+            dto.setType(al.getType());
+        }
+
+        return dto;
+    }
+
+    /* =======================
+       Helpers sûrs
+       ======================= */
+    private Map<String, Object> readJson(String json) {
+        try {
+            if (json == null || json.isBlank()) return null;
+            return objectMapper.readValue(json, Map.class);
+        } catch (Exception e) {
+            return null; // on évite une 500 si JSON invalide
         }
     }
 
-    // DELETE PV - accessible aux GOUVERNEUR et MEMBRE_DSI
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI')")
-    public ResponseEntity<Void> deletePV(@PathVariable Long id) {
-        Optional<PV> pv = pvService.findById(id);
-        if (pv.isPresent()) {
-            pvService.delete(id);
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    private Long safePvId(PV pv) {
+        try { return (Long) PV.class.getMethod("getPvId").invoke(pv); }
+        catch (Exception ignore) {}
+        try { return (Long) PV.class.getMethod("getId").invoke(pv); }
+        catch (Exception ignore) {}
+        return null;
     }
 
-    // GET PVs by rédacteur user ID
-    @GetMapping("/redacteur/{userId}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or #userId == authentication.name")
-    public ResponseEntity<List<PV>> getPVsByRedacteur(@PathVariable String userId) {
-        List<PV> pvs = pvService.findByRedacteurUserId(userId);
-        return new ResponseEntity<>(pvs, HttpStatus.OK);
+    private boolean safeBoolean(Boolean b) {
+        return b != null && b;
     }
 
-    // GET PV by action ID
-    @GetMapping("/action/{actionId}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<PV> getPVByActionId(@PathVariable Long actionId) {
-        Optional<PV> pv = pvService.findByActionId(actionId);
-        if (pv.isPresent()) {
-            return new ResponseEntity<>(pv.get(), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    // GET PVs by date range
-    @GetMapping("/date-range")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<PV>> getPVsByDateRange(
-            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
-            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
-        List<PV> pvs = pvService.findByDateRange(startDate, endDate);
-        return new ResponseEntity<>(pvs, HttpStatus.OK);
-    }
-
-    // GET PVs with PDF
-    @GetMapping("/with-pdf")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<PV>> getPVsWithPDF() {
-        List<PV> pvs = pvService.findPVsWithPDF();
-        return new ResponseEntity<>(pvs, HttpStatus.OK);
-    }
-
-    // GET PVs by current user (rédigés par l'utilisateur connecté)
-    @GetMapping("/my-pvs")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<PV>> getMyPVs() {
-        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
-                .getContext().getAuthentication().getName();
-
-        List<PV> pvs = pvService.findByRedacteurUserId(currentUserId);
-        return new ResponseEntity<>(pvs, HttpStatus.OK);
-    }
-
-    // PUT update PDF URL
-    @PutMapping("/{id}/pdf")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@pvServiceImpl.findById(#id).isPresent() and @pvServiceImpl.findById(#id).get().getRedacteurUserId() == authentication.name)")
-    public ResponseEntity<PV> updatePVPDF(
-            @PathVariable Long id,
-            @RequestBody PDFUpdateRequest request) {
-        Optional<PV> existingPV = pvService.findById(id);
-        if (existingPV.isPresent()) {
-            PV pv = existingPV.get();
-            pv.setUrlPDF(request.getUrlPDF());
-
-            PV updatedPV = pvService.update(pv);
-            return new ResponseEntity<>(updatedPV, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    // GET recent PVs (ordre décroissant par date de rédaction)
-    @GetMapping("/recent")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<PV>> getRecentPVs() {
-        List<PV> pvs = pvService.findAll(Pageable.unpaged()).getContent(); // Le service peut implémenter un ordre par défaut
-        // Trier par date de rédaction décroissante
-        pvs.sort((pv1, pv2) -> pv2.getDateRedaction().compareTo(pv1.getDateRedaction()));
-
-        // Limiter aux 20 plus récents
-        List<PV> recentPVs = pvs.stream().limit(20).toList();
-
-        return new ResponseEntity<>(recentPVs, HttpStatus.OK);
-    }
-
-    // Classe interne pour la mise à jour du PDF
-    public static class PDFUpdateRequest {
-        private String urlPDF;
-
-        public PDFUpdateRequest() {}
-        public PDFUpdateRequest(String urlPDF) {
-            this.urlPDF = urlPDF;
-        }
-
-        public String getUrlPDF() { return urlPDF; }
-        public void setUrlPDF(String urlPDF) { this.urlPDF = urlPDF; }
-    }
+    private Date safeDate(Date d) { return d; }
 }

@@ -1,146 +1,76 @@
+// src/main/java/com/example/HNR/Model/SqlServer/Mission.java
 package com.example.HNR.Model.SqlServer;
-import com.example.HNR.Model.enums.Statut;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import com.example.HNR.Model.enums.Statut;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "missions")
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@Getter @Setter @ToString
 public class Mission {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "mission_id")
-    private Long missionId;
+    private Long missionId; // ← nouveau nom du champ identifiant
 
-    @Column(name = "titre", length = 200, nullable = false)
+    @Column(name="titre", nullable = false, length = 255)
     private String titre;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name="description", columnDefinition = "NVARCHAR(MAX)")
     private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "statut", length = 30, nullable = false)
-    private Statut statut = Statut.EN_COURS; // Valeur par défaut
+    @Column(name="prefecture", nullable = false, length = 150)
+    private String prefecture; // ex: "Préfecture de Ben M'sick"
 
-    @Column(name = "prefecture", length = 100)
-    private String prefecture;
-
-    @Column(name = "commune", length = 100)
+    @Column(name="commune", nullable = false, length = 120)
     private String commune;
 
-    @CreationTimestamp
-    @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "date_envoi", updatable = false)
-    private Date dateEnvoi;
+    @Column(name="date_envoi", nullable = false)
+    private OffsetDateTime dateEnvoi;
 
-    @CreationTimestamp
-    @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "created_at", updatable = false)
-    private Date createdAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name="statut", nullable = false, length = 30)
+    private Statut statut;
 
-    @UpdateTimestamp
-    @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "updated_at")
-    private Date updatedAt;
+    @Column(name="assigned_user_id", nullable = false, length = 64)
+    private String assignedUserId;
 
-    @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "completed_at")
-    private Date completedAt;
-
-    @Column(name = "rapport_pdf", length = 512)
-    private String rapportPDF;
-
-    // Référence (string) vers l'id utilisateur MongoDB inscrit dans le JWT
-    @Column(name = "created_by_user_id", length = 64, updatable = false)
+    @Column(name="created_by_user_id", nullable = false, length = 64)
     private String createdByUserId;
 
-    @ElementCollection
-    @CollectionTable(name = "mission_assigned_users", joinColumns = @JoinColumn(name = "mission_id"))
-    @Column(name = "user_id")
-    private List<String> assignedUserIds = new ArrayList<>();
+    @Column(name="changement_id", nullable = false, length = 64)
+    private String changementId;
 
-    // Relations (ex: actions)
-    @OneToMany(mappedBy = "mission", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Action> actions = new ArrayList<>();
+    @Column(name="geometry_type", nullable = false, length = 30)
+    private String geometryType; // "POLYGON"
 
-    public Mission() {}
+    @Column(name="polygonwkt", nullable = false, columnDefinition = "NVARCHAR(MAX)")
+    private String polygonWKT;
 
-    // === Mapping JSON côté Front ===
-    @JsonProperty("id")
-    public Long getIdJson() { return missionId; }
+    @Column(name="rapportpdf", columnDefinition = "NVARCHAR(MAX)")
+    private String rapportPdf;
 
-    @JsonProperty("status")
-    public String getStatusJson() { return statut != null ? statut.name() : null; }
+    @Column(name="created_at", nullable = false)
+    private OffsetDateTime createdAt;
 
-    // === Getters/Setters requis par les contrôleurs/services ===
-    public Long getMissionId() { return missionId; }
-    public void setMissionId(Long missionId) { this.missionId = missionId; }
+    @Column(name="updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
 
-    public String getTitre() { return titre; }
-    public void setTitre(String titre) { this.titre = titre; }
-
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
-    // Bridge String <-> Enum pour compatibilité existante
-    public String getStatut() { return statut != null ? statut.name() : null; }
-    public void setStatut(String statut) {
-        if (statut == null) {
-            this.statut = null;
-        } else {
-            try {
-                this.statut = Statut.valueOf(statut);
-            } catch (IllegalArgumentException ex) {
-                this.statut = this.statut != null ? this.statut : Statut.EN_COURS;
-            }
-        }
+    @PrePersist
+    public void onCreate() {
+        OffsetDateTime now = OffsetDateTime.now();
+        if (createdAt == null) createdAt = now;
+        if (updatedAt == null) updatedAt = now;
     }
 
-    public Statut getStatutEnum() { return statut; }
-    public void setStatutEnum(Statut statut) { this.statut = statut; }
-
-    public String getPrefecture() { return prefecture; }
-    public void setPrefecture(String prefecture) { this.prefecture = prefecture; }
-
-    public String getCommune() { return commune; }
-    public void setCommune(String commune) { this.commune = commune; }
-
-    public Date getDateEnvoi() { return dateEnvoi; }
-    public void setDateEnvoi(Date dateEnvoi) { this.dateEnvoi = dateEnvoi; }
-
-    public String getCreatedByUserId() { return createdByUserId; }
-    public void setCreatedByUserId(String createdByUserId) { this.createdByUserId = createdByUserId; }
-
-    public List<String> getAssignedUserIds() { return assignedUserIds; }
-    public void setAssignedUserIds(List<String> assignedUserIds) { this.assignedUserIds = assignedUserIds; }
-
-    public String getRapportPDF() { return rapportPDF; }
-    public void setRapportPDF(String rapportPDF) { this.rapportPDF = rapportPDF; }
-
-    public Date getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
-
-    public Date getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
-
-    public Date getCompletedAt() { return completedAt; }
-    public void setCompletedAt(Date completedAt) { this.completedAt = completedAt; }
-
-    public boolean isCompleted() { return this.statut == Statut.TERMINEE || this.completedAt != null; }
-
-    public void complete() {
-        this.statut = Statut.TERMINEE;
-        if (this.completedAt == null) {
-            this.completedAt = new Date();
-        }
+    @PreUpdate
+    public void onUpdate() {
+        updatedAt = OffsetDateTime.now();
     }
 }
-

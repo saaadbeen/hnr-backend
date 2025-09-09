@@ -18,6 +18,8 @@ public interface ActionRepository extends JpaRepository<Action, Long> {
     // Recherche par utilisateur
     List<Action> findByUserId(String userId);
 
+    List<Action> findByMissionMissionId(Long missionId);
+
     // Recherche par douar
     List<Action> findByDouarDouarId(Long douarId);
 

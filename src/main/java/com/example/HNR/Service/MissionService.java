@@ -1,25 +1,20 @@
+// src/main/java/com/example/HNR/Service/MissionService.java
 package com.example.HNR.Service;
 
+import com.example.HNR.DTO.MissionDTO;
+import com.example.HNR.DTO.Request.MissionCreateRequest;
+import com.example.HNR.DTO.Request.MissionUpdateRequest;
 import com.example.HNR.Model.SqlServer.Mission;
-import java.util.Date;
+
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 public interface MissionService {
-    Mission create(Mission mission);
-    Optional<Mission> findById(Long id);
-    Page<Mission> findAll(Pageable pageable);
-    Mission update(Mission mission);
-    void delete(Long id);
+    List<Mission> findAll();
+    Optional<Mission> findByMissionId(Long missionId);
+    List<MissionDTO> findByAssignedUser(String userId);
 
-    // Méthodes métier spécifiques
-    List<Mission> findByStatut(String statut);
-    List<Mission> findByLocation(String prefecture, String commune);
-    List<Mission> findByCreatedByUserId(String userId);
-    List<Mission> findByDateRange(Date startDate, Date endDate);
-    List<Mission> findCompletedMissions();
-    List<Mission> findActiveMissions();
-    void completeMission(Long id);
+    MissionDTO create(MissionCreateRequest req, String createdByUserId);
+    MissionDTO update(Long missionId, MissionUpdateRequest req);
+    void delete(Long missionId);
 }

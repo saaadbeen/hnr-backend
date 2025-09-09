@@ -7,12 +7,14 @@ import com.example.HNR.Model.Mongodb.User;
 import com.example.HNR.Service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,6 +23,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final UserService userService;
@@ -30,6 +33,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest loginRequest) {
         Map<String, Object> response = new HashMap<>();
+
         Optional<User> userOptional = userService.findByEmail(loginRequest.getEmail());
         if (userOptional.isEmpty()) {
             response.put("status", "error");
@@ -60,40 +64,58 @@ public class AuthController {
         response.put("user", userInfo);
         return ResponseEntity.ok(response);
     }
-    @PreAuthorize("hasRole('MEMBRE_DSI')")
+
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest registerRequest,
+                                                        Authentication authentication) {
         Map<String, Object> response = new HashMap<>();
-        if (userService.existsByEmail(registerRequest.getEmail())) {
+
+        try {
+            if (userService.existsByEmail(registerRequest.getEmail())) {
+                response.put("status", "error");
+                response.put("message", "Cet email existe déjà");
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+
+            User newUser = new User();
+            newUser.setFullName(registerRequest.getFullName());
+            newUser.setEmail(registerRequest.getEmail());
+            // Si l'encodage n'est PAS fait dans UserServiceImpl#create, décommente la ligne suivante :
+            // newUser.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
+            newUser.setPassword(registerRequest.getPassword());
+            newUser.setRole(registerRequest.getRole());
+            newUser.setPrefecture(registerRequest.getPrefecture());
+            newUser.setCommune(registerRequest.getCommune());
+            newUser.setCreatedAt(new Date());
+
+            User savedUser = userService.create(newUser);
+
+            if (savedUser.getEmail() == null) {
+                log.debug("userlog {}", savedUser);
+            }
+
+            Map<String, Object> userInfo = new HashMap<>();
+            userInfo.put("userid", savedUser.getUserid());
+            userInfo.put("fullName", savedUser.getFullName());
+            userInfo.put("email", savedUser.getEmail());
+            userInfo.put("role", savedUser.getRole().name());
+            userInfo.put("prefecture", savedUser.getPrefecture());
+            userInfo.put("commune", savedUser.getCommune());
+
+            response.put("status", "success");
+            response.put("message", "Utilisateur créé avec succès.");
+            response.put("user", userInfo);
+
+            // 201 + Location vers la ressource
+            URI location = URI.create("/api/users/" + savedUser.getUserid());
+            return ResponseEntity.created(location).body(response);
+
+        } catch (Exception e) {
+            log.error("Error creating user: {}", e.getMessage(), e);
             response.put("status", "error");
-            response.put("message", "Cet email existe déjà");
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            response.put("message", "Erreur lors de la création de l'utilisateur");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
-
-        User newUser = new User();
-        newUser.setFullName(registerRequest.getFullName());
-        newUser.setEmail(registerRequest.getEmail());
-        // L'encodage est géré dans UserServiceImpl#create pour éviter le double encodage
-        newUser.setPassword(registerRequest.getPassword());
-        newUser.setRole(registerRequest.getRole());
-        newUser.setPrefecture(registerRequest.getPrefecture());
-        newUser.setCommune(registerRequest.getCommune());
-        newUser.setCreatedAt(new Date());
-
-        User savedUser = userService.create(newUser);
-
-        Map<String, Object> userInfo = new HashMap<>();
-        userInfo.put("userid", savedUser.getUserid());
-        userInfo.put("fullName", savedUser.getFullName());
-        userInfo.put("email", savedUser.getEmail());
-        userInfo.put("role", savedUser.getRole().name());
-        userInfo.put("prefecture", savedUser.getPrefecture());
-        userInfo.put("commune", savedUser.getCommune());
-
-        response.put("status", "success");
-        response.put("message", "Utilisateur créé avec succès");
-        response.put("user", userInfo);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/me")
@@ -148,4 +170,3 @@ public class AuthController {
         }
     }
 }
-

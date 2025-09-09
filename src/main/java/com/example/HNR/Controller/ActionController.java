@@ -1,6 +1,10 @@
 package com.example.HNR.Controller;
-
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.example.HNR.DTO.ActionDTO;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.bind.annotation.RequestParam;
 import com.example.HNR.Model.SqlServer.Action;
 import com.example.HNR.Model.SqlServer.Douar;
 import com.example.HNR.Model.SqlServer.Mission;
@@ -8,21 +12,28 @@ import com.example.HNR.Model.SqlServer.PV;
 import com.example.HNR.Model.enums.TypeAction;
 import com.example.HNR.Repository.SqlServer.DouarRepository;
 import com.example.HNR.Repository.SqlServer.MissionRepository;
+import com.example.HNR.Service.FichierService;
+
 import com.example.HNR.Repository.SqlServer.PVRepository;
 import com.example.HNR.Service.ActionService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import com.example.HNR.Util.FileUtils;
 import org.springframework.web.server.ResponseStatusException;
-import java.nio.file.*;
-import java.util.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
+import java.nio.file.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import com.example.HNR.Model.SqlServer.PV;
+import com.example.HNR.Service.PVService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.Map;
 @RestController
 @RequestMapping("/api/actions")
 public class ActionController {
@@ -31,6 +42,11 @@ public class ActionController {
     @Autowired private DouarRepository douarRepository;
     @Autowired private MissionRepository missionRepository;
     @Autowired private PVRepository pvRepository;
+    @Autowired private final FichierService fichierService;
+
+    public ActionController(FichierService fichierService) {
+        this.fichierService = fichierService;
+    }
 
     // ---------- mapping manuel ----------
     private ActionDTO toDto(Action e) {
@@ -87,7 +103,6 @@ public class ActionController {
     // -----------------------------------
 
     @GetMapping
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<Page<ActionDTO>> getAllActions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -96,7 +111,6 @@ public class ActionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ActionDTO> getActionById(@PathVariable Long id) {
         return actionService.findById(id)
                 .map(this::toDto)
@@ -105,37 +119,82 @@ public class ActionController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<ActionDTO> createAction( @RequestBody ActionDTO dto) {
-        // Validation minimale des champs obligatoires
-        if (dto == null || dto.getDouarId() == null || dto.getType() == null) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+    public ResponseEntity<?> createAction(@RequestBody ActionDTO dto) {
+        if (dto == null || dto.getMissionId() == null || dto.getUserId() == null || dto.getType() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Champs obligatoires: type, missionId, userId"));
         }
-        // Forcer l'ID utilisateur depuis le contexte de sécurité
-        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
-                .getContext().getAuthentication().getName();
-        dto.setUserId(currentUserId);
-        if (dto.getDateAction() == null) dto.setDateAction(new Date());
-        var saved = actionService.create(fromDto(dto));
-        return new ResponseEntity<>(toDto(saved), HttpStatus.CREATED);
+        if (dto.getDouarId() == null) {
+            return ResponseEntity.badRequest().body(Map.of("douarId", "Le douar est obligatoire"));
+        }
+        try {
+            Action saved = actionService.create(fromDto(dto));
+            return ResponseEntity.status(HttpStatus.CREATED).body(toDto(saved));
+        } catch (DataIntegrityViolationException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Violation d'intégrité", "detail", ex.getMostSpecificCause().getMessage()));
+        }
+    }
+    @Autowired private PVService pvService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @PostMapping("/{id}/pv")
+    @PreAuthorize("hasRole('AGENT_AUTORITE')")
+    public ResponseEntity<PV> createPVForAction(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body) {
+
+        var actionOpt = actionService.findById(id);
+        if (actionOpt.isEmpty()) return ResponseEntity.notFound().build();
+
+        String contenuJson = "{}";
+        String redacteurUserId = actionOpt.get().getUserId(); // défaut = créateur de l’action
+
+        try {
+            if (body != null) {
+                Object contenu = body.get("contenu");
+                if (contenu != null) {
+                    contenuJson = (contenu instanceof String)
+                            ? (String) contenu
+                            : objectMapper.writeValueAsString(contenu);
+                }
+                Object who = body.get("redacteurUserId");
+                if (who == null) who = body.get("createdBy");
+                if (who == null) who = body.get("userId");
+                if (who != null) redacteurUserId = String.valueOf(who);
+            }
+        } catch (Exception ignore) {}
+
+        PV saved = pvService.createForAction(id, contenuJson, redacteurUserId);
+        return new ResponseEntity<>(saved, HttpStatus.CREATED);
+    }
+
+
+    private String generateNumeroPv(Long actionId) {
+        String ts = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+        return "PV-" + (actionId != null ? actionId : "NA") + "-" + ts;
+    }
+    @GetMapping("/mission/{missionId}")
+    public ResponseEntity<List<ActionDTO>> getActionsByMission(@PathVariable Long missionId) {
+        List<ActionDTO> out = actionService.findByMissionId(missionId).stream().map(this::toDto).toList();
+        return ResponseEntity.ok(out);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@actionServiceImpl.findById(#id).isPresent() and @actionServiceImpl.findById(#id).get().getUserId() == authentication.name)")
-    public ResponseEntity<ActionDTO> updateAction(@PathVariable Long id,  @RequestBody ActionDTO dto) {
-        var existing = actionService.findById(id);
-        if (existing.isEmpty()) return ResponseEntity.notFound().build();
 
+    public ResponseEntity<ActionDTO> updateAction(@PathVariable Long id, @RequestBody ActionDTO dto) {
+        var existingOpt = actionService.findById(id);
+        if (existingOpt.isEmpty()) return ResponseEntity.notFound().build();
+        Action existing = existingOpt.get();
+        if (existing.getPv() != null) return new ResponseEntity<>(HttpStatus.FORBIDDEN); // ← figée
         dto.setActionId(id);
-        var entity = fromDto(dto);
-        entity.setCreatedAt(existing.get().getCreatedAt());
-
-        var saved = actionService.update(entity);
+        Action entity = fromDto(dto);
+        entity.setCreatedAt(existing.getCreatedAt());
+        Action saved = actionService.update(entity);
         return ResponseEntity.ok(toDto(saved));
     }
 
+
+
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI')")
     public ResponseEntity<Void> deleteAction(@PathVariable Long id) {
         if (actionService.findById(id).isEmpty()) return ResponseEntity.notFound().build();
         actionService.delete(id);
@@ -144,35 +203,34 @@ public class ActionController {
 
     // ========= Filtres =========
     @GetMapping("/type/{type}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+
     public ResponseEntity<List<ActionDTO>> getActionsByType(@PathVariable TypeAction type) {
         var dtos = actionService.findByType(type).stream().map(this::toDto).toList();
         return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or #userId == authentication.name")
     public ResponseEntity<List<ActionDTO>> getActionsByUserId(@PathVariable String userId) {
         var dtos = actionService.findByUserId(userId).stream().map(this::toDto).toList();
         return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/douar/{douarId}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+
     public ResponseEntity<List<ActionDTO>> getActionsByDouarId(@PathVariable Long douarId) {
         var dtos = actionService.findByDouarId(douarId).stream().map(this::toDto).toList();
         return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/location")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+
     public ResponseEntity<List<ActionDTO>> getActionsByLocation(@RequestParam String prefecture, @RequestParam String commune) {
         var dtos = actionService.findByLocation(prefecture, commune).stream().map(this::toDto).toList();
         return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/date-range")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+
     public ResponseEntity<List<ActionDTO>> getActionsByDateRange(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
@@ -181,14 +239,14 @@ public class ActionController {
     }
 
     @GetMapping("/with-pv")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+
     public ResponseEntity<List<ActionDTO>> getActionsWithPV() {
         var dtos = actionService.findActionsWithPV().stream().map(this::toDto).toList();
         return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/my-actions")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+
     public ResponseEntity<List<ActionDTO>> getMyActions() {
         String currentUserId = org.springframework.security.core.context.SecurityContextHolder
                 .getContext().getAuthentication().getName();
@@ -197,14 +255,14 @@ public class ActionController {
     }
 
     @GetMapping("/demolitions")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+
     public ResponseEntity<List<ActionDTO>> getDemolitions() {
         var dtos = actionService.findByType(TypeAction.DEMOLITION).stream().map(this::toDto).toList();
         return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/signalements")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+
     public ResponseEntity<List<ActionDTO>> getSignalements() {
         var dtos = actionService.findByType(TypeAction.SIGNALEMENT).stream().map(this::toDto).toList();
         return ResponseEntity.ok(dtos);
@@ -213,34 +271,30 @@ public class ActionController {
     // ========= Upload photos =========
 
     @PostMapping("/{id}/photo-avant")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+    @PreAuthorize("hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ActionDTO> uploadPhotoAvant(@PathVariable Long id,
-                                                      @RequestParam("file") MultipartFile file) throws Exception {
-        var opt = actionService.findById(id);
-        if (opt.isEmpty()) return ResponseEntity.notFound().build();
-
-        String url = saveActionFile(id, file, "avant");
-        var action = opt.get();
-        action.setPhotoAvantUrl(url);
-        var saved = actionService.update(action);
-
+                                                      @RequestParam("file") MultipartFile file) {
+        Action a = actionService.findById(id).orElse(null);
+        if (a == null) return ResponseEntity.notFound().build();
+        String url = fichierService.storeActionPhoto(id, "avant", file); // ← maintenant résolu
+        a.setPhotoAvantUrl(url);
+        Action saved = actionService.update(a);
         return ResponseEntity.ok(toDto(saved));
     }
 
     @PostMapping("/{id}/photo-apres")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
+    @PreAuthorize("hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ActionDTO> uploadPhotoApres(@PathVariable Long id,
-                                                      @RequestParam("file") MultipartFile file) throws Exception {
-        var opt = actionService.findById(id);
-        if (opt.isEmpty()) return ResponseEntity.notFound().build();
-
-        String url = saveActionFile(id, file, "apres");
-        var action = opt.get();
-        action.setPhotoApresUrl(url);
-        var saved = actionService.update(action);
-
+                                                      @RequestParam("file") MultipartFile file) {
+        Action a = actionService.findById(id).orElse(null);
+        if (a == null) return ResponseEntity.notFound().build();
+        String url = fichierService.storeActionPhoto(id, "apres", file);
+        a.setPhotoApresUrl(url);
+        Action saved = actionService.update(a);
         return ResponseEntity.ok(toDto(saved));
     }
+
+
 
     // --- utilitaire local pour sauvegarder un fichier uploadé ---
     private String saveActionFile(Long id, MultipartFile file, String slot) throws Exception {

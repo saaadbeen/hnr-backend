@@ -1,274 +1,138 @@
 package com.example.HNR.Controller;
 
-import com.example.HNR.Model.SqlServer.Fichier;
-import com.example.HNR.Service.FichierService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;                 // ✅ attention à l'import
+import org.springframework.core.io.UrlResource;          // ✅
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/fichiers")
+@Slf4j
 public class FichierController {
 
-    @Autowired
-    private FichierService fichierService;
+    /** Dossier de stockage (configurable via application.yml: app.upload-dir: uploads) */
+    @Value("${app.upload-dir:uploads}")
+    private String uploadDir;
 
-    // GET all fichiers - accessible à tous les rôles authentifiés
-    @GetMapping
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<Page<Fichier>> getAllFichiers(@RequestParam(defaultValue = "0") int page,
-                                                        @RequestParam(defaultValue = "10") int size) {
-        Page<Fichier> fichiers = fichierService.findAll(PageRequest.of(page, size));
-        return new ResponseEntity<>(fichiers, HttpStatus.OK);
+    /** Sauvegarde un fichier et renvoie les URLs (affichage + download). */
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> upload(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "entity", required = false) String entity,
+            @RequestParam(value = "entityId", required = false) String entityId
+    ) throws IOException {
+
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Fichier manquant"));
+        }
+
+        // Création du dossier si besoin
+        Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Files.createDirectories(root);
+
+        // Nom de fichier sécurisé + unique
+        String original = StringUtils.cleanPath(Objects.requireNonNullElse(file.getOriginalFilename(), "file.bin"));
+        String safeBase = original.replace("\\", "_").replace("/", "_");
+        String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        String stored = ts + "_" + UUID.randomUUID() + "_" + safeBase;
+
+        Path target = root.resolve(stored).normalize();
+        // Évite toute évasion de chemin
+        if (!target.startsWith(root)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Nom de fichier invalide"));
+        }
+
+        // Copie
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+        // Construit des URLs publiques relatives à l'API
+        String base = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/fichiers")
+                .toUriString();
+
+        String rawUrl = base + "/raw/" + stored;
+        String downloadUrl = base + "/download/" + stored;
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("filename", stored);
+        body.put("originalName", original);
+        body.put("size", file.getSize());
+        body.put("contentType", Optional.ofNullable(file.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE));
+        body.put("url", rawUrl);              // 👈 ton front lit d’abord "url"
+        body.put("downloadUrl", downloadUrl); // … ou "downloadUrl"
+        body.put("path", stored);             // … ou "path"
+        body.put("entity", entity);
+        body.put("entityId", entityId);
+
+        return ResponseEntity.ok(body);
     }
 
-    // GET fichier by id
-    @GetMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<Fichier> getFichierById(@PathVariable Long id) {
-        Optional<Fichier> fichier = fichierService.findById(id);
-        if (fichier.isPresent()) {
-            return new ResponseEntity<>(fichier.get(), HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    /** Affiche le fichier (Content-Disposition: inline). Utile pour PDF/Images. */
+    @GetMapping("/raw/{filename:.+}")
+    public ResponseEntity<Resource> serveInline(@PathVariable String filename) throws IOException {
+        Resource res = loadAsResource(filename);
+        if (res == null || !res.exists()) return ResponseEntity.notFound().build();
+
+        MediaType type = probeContentType(res);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDispositionInline(res.getFilename()))
+                .contentType(type)
+                .body(res);
+    }
+
+    /** Télécharge le fichier (Content-Disposition: attachment). */
+    @GetMapping("/download/{filename:.+}")
+    public ResponseEntity<Resource> download(@PathVariable String filename) throws IOException {
+        Resource res = loadAsResource(filename);
+        if (res == null || !res.exists()) return ResponseEntity.notFound().build();
+
+        MediaType type = probeContentType(res);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDispositionAttachment(res.getFilename()))
+                .contentType(type)
+                .body(res);
+    }
+
+    // ===================== helpers =====================
+
+    private Resource loadAsResource(String filename) throws MalformedURLException {
+        Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path path = root.resolve(filename).normalize();
+        if (!path.startsWith(root)) return null; // protection path traversal
+        return new UrlResource(path.toUri());
+    }
+
+    private MediaType probeContentType(Resource res) throws IOException {
+        try {
+            Path p = Paths.get(res.getURI());
+            String ct = Files.probeContentType(p);
+            return (ct != null) ? MediaType.parseMediaType(ct) : MediaType.APPLICATION_OCTET_STREAM;
+        } catch (Exception e) {
+            return MediaType.APPLICATION_OCTET_STREAM;
         }
     }
 
-    // POST create fichier - accessible à tous les rôles authentifiés
-    @PostMapping
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<Fichier> createFichier(@RequestBody Fichier fichier) {
-        // Validation basique
-        if (fichier == null) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-        if (fichier.getFileName() == null || fichier.getFileName().trim().isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-        if (fichier.getFilePath() == null || fichier.getFilePath().trim().isEmpty()
-                || fichier.getUrl() == null || fichier.getUrl().trim().isEmpty()
-                || fichier.getContentType() == null || fichier.getContentType().trim().isEmpty()
-                || fichier.getSize() == null || fichier.getSize() < 0) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-        if (fichier.getUploadedByUserId() == null || fichier.getUploadedByUserId().trim().isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
-
-        // Définir la date d'upload si non fournie
-        if (fichier.getUploadedAt() == null) {
-            fichier.setUploadedAt(new Date());
-        }
-
-        // S'assurer que le fichier n'est pas marqué comme supprimé à la création
-        fichier.setDeletedAt(null);
-
-        Fichier savedFichier = fichierService.create(fichier);
-        return new ResponseEntity<>(savedFichier, HttpStatus.CREATED);
+    private String contentDispositionInline(String filename) {
+        return "inline; filename=\"" + Optional.ofNullable(filename).orElse("file") + "\"";
     }
 
-    // PUT update fichier - uploader + GOUVERNEUR/MEMBRE_DSI
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@fichierServiceImpl.findById(#id).isPresent() and @fichierServiceImpl.findById(#id).get().getUploadedByUserId() == authentication.name)")
-    public ResponseEntity<Fichier> updateFichier(@PathVariable Long id, @RequestBody Fichier fichier) {
-        Optional<Fichier> existingFichier = fichierService.findById(id);
-        if (existingFichier.isPresent()) {
-            fichier.setFichierId(id);
-            // Conserver les métadonnées originales
-            fichier.setUploadedAt(existingFichier.get().getUploadedAt());
-            fichier.setDeletedAt(existingFichier.get().getDeletedAt());
-
-            Fichier updatedFichier = fichierService.update(fichier);
-            return new ResponseEntity<>(updatedFichier, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    // DELETE fichier (soft delete) - uploader + GOUVERNEUR/MEMBRE_DSI
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@fichierServiceImpl.findById(#id).isPresent() and @fichierServiceImpl.findById(#id).get().getUploadedByUserId() == authentication.name)")
-    public ResponseEntity<Void> deleteFichier(@PathVariable Long id) {
-        Optional<Fichier> fichier = fichierService.findById(id);
-        if (fichier.isPresent()) {
-            fichierService.delete(id); // Effectue un soft delete
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    // GET fichiers by content type
-    @GetMapping("/content-type/{contentType}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getFichiersByContentType(@PathVariable String contentType) {
-        List<Fichier> fichiers = fichierService.findByContentType(contentType);
-        return new ResponseEntity<>(fichiers, HttpStatus.OK);
-    }
-
-    // GET fichiers by uploader user ID
-    @GetMapping("/uploaded-by/{userId}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or #userId == authentication.name")
-    public ResponseEntity<List<Fichier>> getFichiersByUploader(@PathVariable String userId) {
-        List<Fichier> fichiers = fichierService.findByUserId(userId);
-        return new ResponseEntity<>(fichiers, HttpStatus.OK);
-    }
-
-    // GET fichiers by changement ID
-    @GetMapping("/changement/{changementId}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getFichiersByChangementId(@PathVariable Long changementId) {
-        List<Fichier> fichiers = fichierService.findByChangementId(changementId);
-        return new ResponseEntity<>(fichiers, HttpStatus.OK);
-    }
-
-    // GET fichiers by entity
-    @GetMapping("/entity/{entityType}/{entityId}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getFichiersByEntity(
-            @PathVariable String entityType,
-            @PathVariable Long entityId) {
-        List<Fichier> fichiers = fichierService.findByEntity(entityType, entityId);
-        return new ResponseEntity<>(fichiers, HttpStatus.OK);
-    }
-
-    // GET images only
-    @GetMapping("/images")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getImages() {
-        List<Fichier> images = fichierService.findImages();
-        return new ResponseEntity<>(images, HttpStatus.OK);
-    }
-
-    // GET active fichiers (non supprimés)
-    @GetMapping("/active")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getActiveFichiers() {
-        List<Fichier> fichiers = fichierService.findActiveFichiers();
-        return new ResponseEntity<>(fichiers, HttpStatus.OK);
-    }
-
-    // GET fichiers by current user (uploadés par l'utilisateur connecté)
-    @GetMapping("/my-fichiers")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getMyFichiers() {
-        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
-                .getContext().getAuthentication().getName();
-
-        List<Fichier> fichiers = fichierService.findByUserId(currentUserId);
-        return new ResponseEntity<>(fichiers, HttpStatus.OK);
-    }
-
-    // GET PDFs only
-    @GetMapping("/pdfs")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getPDFs() {
-        List<Fichier> pdfs = fichierService.findByContentType("application/pdf");
-        return new ResponseEntity<>(pdfs, HttpStatus.OK);
-    }
-
-    // GET recent fichiers (ordre décroissant par date d'upload)
-    @GetMapping("/recent")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getRecentFichiers() {
-        List<Fichier> fichiers = fichierService.findActiveFichiers();
-        // Trier par date d'upload décroissante
-        fichiers.sort((f1, f2) -> f2.getUploadedAt().compareTo(f1.getUploadedAt()));
-
-        // Limiter aux 20 plus récents
-        List<Fichier> recentFichiers = fichiers.stream().limit(20).toList();
-
-        return new ResponseEntity<>(recentFichiers, HttpStatus.OK);
-    }
-
-    // PUT restore deleted fichier - uploader + GOUVERNEUR/MEMBRE_DSI
-    @PutMapping("/{id}/restore")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@fichierServiceImpl.findById(#id).isPresent() and @fichierServiceImpl.findById(#id).get().getUploadedByUserId() == authentication.name)")
-    public ResponseEntity<Fichier> restoreFichier(@PathVariable Long id) {
-        Optional<Fichier> existingFichier = fichierService.findById(id);
-        if (existingFichier.isPresent()) {
-            Fichier fichier = existingFichier.get();
-            if (!fichier.isDeleted()) {
-                return new ResponseEntity<>(HttpStatus.CONFLICT); // Déjà actif
-            }
-
-            fichier.setDeletedAt(null); // Restaurer
-            Fichier restoredFichier = fichierService.update(fichier);
-            return new ResponseEntity<>(restoredFichier, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    // PUT update file metadata
-    @PutMapping("/{id}/metadata")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@fichierServiceImpl.findById(#id).isPresent() and @fichierServiceImpl.findById(#id).get().getUploadedByUserId() == authentication.name)")
-    public ResponseEntity<Fichier> updateFichierMetadata(
-            @PathVariable Long id,
-            @RequestBody FileMetadataUpdateRequest request) {
-        Optional<Fichier> existingFichier = fichierService.findById(id);
-        if (existingFichier.isPresent()) {
-            Fichier fichier = existingFichier.get();
-
-            if (request.getEntityType() != null) {
-                fichier.setEntityType(request.getEntityType());
-            }
-            if (request.getEntityId() != null) {
-                fichier.setEntityId(request.getEntityId());
-            }
-            if (request.getFileName() != null) {
-                fichier.setFileName(request.getFileName());
-            }
-
-            Fichier updatedFichier = fichierService.update(fichier);
-            return new ResponseEntity<>(updatedFichier, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    // GET fichiers by file extension
-    @GetMapping("/extension/{extension}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<Fichier>> getFichiersByExtension(@PathVariable String extension) {
-        List<Fichier> allFichiers = fichierService.findActiveFichiers();
-        List<Fichier> filteredFichiers = allFichiers.stream()
-                .filter(f -> f.getFileName().toLowerCase().endsWith("." + extension.toLowerCase()))
-                .toList();
-
-        return new ResponseEntity<>(filteredFichiers, HttpStatus.OK);
-    }
-
-    // Classe interne pour la mise à jour des métadonnées
-    public static class FileMetadataUpdateRequest {
-        private String entityType;
-        private Long entityId;
-        private String fileName;
-
-        public FileMetadataUpdateRequest() {}
-
-        public FileMetadataUpdateRequest(String entityType, Long entityId, String fileName) {
-            this.entityType = entityType;
-            this.entityId = entityId;
-            this.fileName = fileName;
-        }
-
-        // Getters et Setters
-        public String getEntityType() { return entityType; }
-        public void setEntityType(String entityType) { this.entityType = entityType; }
-
-        public Long getEntityId() { return entityId; }
-        public void setEntityId(Long entityId) { this.entityId = entityId; }
-
-        public String getFileName() { return fileName; }
-        public void setFileName(String fileName) { this.fileName = fileName; }
+    private String contentDispositionAttachment(String filename) {
+        return "attachment; filename=\"" + Optional.ofNullable(filename).orElse("file") + "\"";
     }
 }

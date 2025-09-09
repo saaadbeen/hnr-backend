@@ -6,7 +6,6 @@ import com.example.HNR.Model.SqlServer.Douar;
 import com.example.HNR.Model.enums.TypeExtension;
 import com.example.HNR.Service.ChangementService;
 import com.example.HNR.Repository.SqlServer.DouarRepository;
-// import com.example.HNR.Service.FichierService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -16,8 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
 import java.util.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/changements")
@@ -26,22 +24,29 @@ public class ChangementController {
     @Autowired private ChangementService changementService;
     @Autowired private DouarRepository douarRepository;
 
-    // ---------- mapping manuel ----------
     private ChangementDTO toDto(Changement e) {
         ChangementDTO d = new ChangementDTO();
-        d.changementId    = e.getChangementId();
-        d.type            = e.getType();
-        d.dateBefore      = e.getDateBefore();
-        d.dateAfter       = e.getDateAfter();
-        d.surface         = e.getSurface();
-        d.douarId         = (e.getDouar() != null ? e.getDouar().getDouarId() : null);
-        d.detectedByUserId= e.getDetectedByUserId();
-        d.createdAt       = e.getCreatedAt();
-        d.updatedAt       = e.getUpdatedAt();
+        d.changementId     = e.getChangementId();
+        d.type             = e.getType();
+        d.date             = e.getDate();
+        d.detectedByUserId = e.getDetectedByUserId();
+        d.createdAt        = e.getCreatedAt();
+        d.updatedAt        = e.getUpdatedAt();
+        d.pdfUrl           = e.getPdfUrl();
 
-        // // Optionnel: dernier PDF attaché
-        // var pdfs = fichierService.findByEntity("CHANGEMENT_PDF", e.getChangementId());
-        // d.pdfUrl = pdfs.isEmpty() ? null : pdfs.get(0).getUrl();
+        d.titre       = e.getTitre();
+        d.description = e.getDescription();
+        d.prefecture  = e.getPrefecture();
+        d.commune     = e.getCommune();
+
+        d.longitude   = e.getLongitude();
+        d.latitude    = e.getLatitude();
+        d.pointWKT    = e.getPointWkt();
+        d.polygonWKT  = e.getPolygonWkt();
+
+        if (e.getDouar() != null) {
+            d.douarId = e.getDouar().getDouarId();
+        }
         return d;
     }
 
@@ -49,28 +54,35 @@ public class ChangementController {
         Changement e = new Changement();
         e.setChangementId(d.changementId);
         e.setType(d.type);
-        e.setDateBefore(d.dateBefore);
-        e.setDateAfter(d.dateAfter);
-        e.setSurface(d.surface);
+        e.setDate(d.date != null ? d.date : new Date()); // une seule date
+
         e.setDetectedByUserId(d.detectedByUserId);
 
         if (d.douarId != null) {
-            Douar douar = douarRepository.findById(d.douarId)
-                    .orElseThrow(() -> new IllegalArgumentException("Douar introuvable: " + d.douarId));
+            Douar douar = douarRepository.findById(d.douarId).orElse(null);
             e.setDouar(douar);
-        } else {
-            e.setDouar(null);
         }
+
+        e.setTitre(d.titre);
+        e.setDescription(d.description);
+        e.setPrefecture(d.prefecture);
+        e.setCommune(d.commune);
+
+        e.setLongitude(d.longitude);
+        e.setLatitude(d.latitude);
+        e.setPointWkt(d.pointWKT);
+        e.setPolygonWkt(d.polygonWKT);
+
+        e.setPdfUrl(d.pdfUrl);
         return e;
     }
-    // -----------------------------------
+
+    /* ------------------------- endpoints ------------------------- */
 
     @GetMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<Page<ChangementDTO>> getAllChangements(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        var dtos = changementService.findAll(PageRequest.of(page, size)).map(this::toDto);
+    public ResponseEntity<List<ChangementDTO>> getAllChangements() {
+        var dtos = changementService.findAll().stream().map(this::toDto).collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
 
@@ -86,22 +98,18 @@ public class ChangementController {
     @PostMapping
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<ChangementDTO> createChangement(@Valid @RequestBody ChangementDTO dto) {
-        if (dto.dateBefore == null) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
         var saved = changementService.create(fromDto(dto));
         return new ResponseEntity<>(toDto(saved), HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or (@changementServiceImpl.findById(#id).isPresent() and @changementServiceImpl.findById(#id).get().getDetectedByUserId() == authentication.name)")
+    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI')")
     public ResponseEntity<ChangementDTO> updateChangement(@PathVariable Long id, @Valid @RequestBody ChangementDTO dto) {
         var existing = changementService.findById(id);
         if (existing.isEmpty()) return ResponseEntity.notFound().build();
 
         dto.changementId = id;
         var entity = fromDto(dto);
-        // préserver createdAt si géré par l’entité
         entity.setCreatedAt(existing.get().getCreatedAt());
 
         var saved = changementService.update(entity);
@@ -116,7 +124,6 @@ public class ChangementController {
         return ResponseEntity.noContent().build();
     }
 
-    // Filtres — mêmes signatures, mais retours en DTO
     @GetMapping("/type/{type}")
     @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
     public ResponseEntity<List<ChangementDTO>> getChangementsByType(@PathVariable TypeExtension type) {
@@ -146,36 +153,4 @@ public class ChangementController {
         var dtos = changementService.findByDateRange(startDate, endDate).stream().map(this::toDto).toList();
         return ResponseEntity.ok(dtos);
     }
-
-    @GetMapping("/surface-minimum")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<ChangementDTO>> getChangementsBySurfaceMinimum(@RequestParam Double minSurface) {
-        if (minSurface < 0) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        var dtos = changementService.findBySurfaceMinimum(minSurface).stream().map(this::toDto).toList();
-        return ResponseEntity.ok(dtos);
-    }
-
-    @GetMapping("/my-changements")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<ChangementDTO>> getMyChangements() {
-        String currentUserId = org.springframework.security.core.context.SecurityContextHolder
-                .getContext().getAuthentication().getName();
-        var dtos = changementService.findByDetectedByUserId(currentUserId).stream().map(this::toDto).toList();
-        return ResponseEntity.ok(dtos);
-    }
-
-    @GetMapping("/horizontal")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<ChangementDTO>> getHorizontalExtensions() {
-        var dtos = changementService.findByType(TypeExtension.HORIZONTAL).stream().map(this::toDto).toList();
-        return ResponseEntity.ok(dtos);
-    }
-
-    @GetMapping("/vertical")
-    @PreAuthorize("hasRole('GOUVERNEUR') or hasRole('MEMBRE_DSI') or hasRole('AGENT_AUTORITE')")
-    public ResponseEntity<List<ChangementDTO>> getVerticalExtensions() {
-        var dtos = changementService.findByType(TypeExtension.VERTICAL).stream().map(this::toDto).toList();
-        return ResponseEntity.ok(dtos);
-    }
-
 }

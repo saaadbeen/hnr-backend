@@ -11,9 +11,11 @@ import org.springframework.data.domain.Pageable;
 public interface ActionService {
     Action create(Action action);
     Optional<Action> findById(Long id);
+    List<Action> findAll();
     Page<Action> findAll(Pageable pageable);
     Action update(Action action);
     void delete(Long id);
+    List<Action> findByMissionId(Long missionId);
 
     // Méthodes métier spécifiques
     List<Action> findByType(TypeAction type);
